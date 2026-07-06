@@ -18,9 +18,51 @@ To build an intelligent and explainable cybersecurity platform that helps users 
 
 - Frontend: React, Vite, Tailwind CSS
 - Backend: FastAPI (Python)
-- Database: PostgreSQL
+- Database: PostgreSQL for auth/session storage and server-side records
 - ML: Scikit-learn, XGBoost, Pandas, NumPy
 
 ---
 
 See `docs/` for architecture, API design, and roadmap.
+
+## Development — Quick Start
+
+Verify tools:
+
+```powershell
+node -v
+npm -v
+python --version
+pip --version
+psql --version
+```
+
+Start both services (Windows PowerShell):
+
+```powershell
+.\start-dev.ps1
+```
+
+Or run services individually:
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Backend:
+
+```powershell
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r ../requirements.txt
+set CYBERGUARDIAN_DATABASE_URL=postgresql://postgres:password@localhost:5432/cyberguardian
+uvicorn main:app --reload
+```
+
+Open the frontend at the URL shown by Vite (usually http://localhost:5173) and the backend at `http://127.0.0.1:8000`.
+

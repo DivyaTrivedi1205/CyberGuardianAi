@@ -2,17 +2,19 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from psycopg2.extras import RealDictCursor
-from backend.database.connection import db_connection, now_ts
-from backend.models.auth import UserOut
-from backend.routes.auth import get_current_user
-from backend.routes.security import get_optional_user
+from database.connection import db_connection, now_ts
+from models.auth import UserOut
+from routes.auth import get_current_user
+from routes.security import get_optional_user
 
 router = APIRouter(prefix="/community", tags=["community"])
+
 
 class CommunityReportRequest(BaseModel):
     indicator_type: str  # 'url' or 'message'
     indicator_value: str
     description: Optional[str] = None
+
 
 class CommunityReportResponse(BaseModel):
     id: int
@@ -24,18 +26,21 @@ class CommunityReportResponse(BaseModel):
     status: str
     created_at: int
 
+
 @router.post("/report", response_model=CommunityReportResponse)
 def report_threat(
     payload: CommunityReportRequest,
-    current_user: Optional[UserOut] = Depends(get_optional_user)
+    current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> CommunityReportResponse:
     val = payload.indicator_value.strip()
     if not val:
         raise HTTPException(status_code=400, detail="Indicator value cannot be empty.")
-    
+
     ind_type = payload.indicator_type.strip().lower()
     if ind_type not in ["url", "message"]:
-        raise HTTPException(status_code=400, detail="Indicator type must be 'url' or 'message'.")
+        raise HTTPException(
+            status_code=400, detail="Indicator type must be 'url' or 'message'."
+        )
 
     # Normalize url to lowercase
     if ind_type == "url":
@@ -53,7 +58,7 @@ def report_threat(
                 FROM community_reports
                 WHERE indicator_value = %s AND indicator_type = %s
                 """,
-                (val, ind_type)
+                (val, ind_type),
             )
             row = cursor.fetchone()
             if row:
@@ -66,7 +71,7 @@ def report_threat(
                     WHERE id = %s
                     RETURNING id, user_id, indicator_type, indicator_value, description, reports_count, status, created_at
                     """,
-                    (row["id"],)
+                    (row["id"],),
                 )
                 updated_row = cursor.fetchone()
                 connection.commit()
@@ -79,11 +84,12 @@ def report_threat(
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, user_id, indicator_type, indicator_value, description, reports_count, status, created_at
                     """,
-                    (uid, ind_type, val, payload.description, 1, 'pending', timestamp)
+                    (uid, ind_type, val, payload.description, 1, "pending", timestamp),
                 )
                 new_row = cursor.fetchone()
                 connection.commit()
                 return CommunityReportResponse(**dict(new_row))
+
 
 @router.get("/reports", response_model=List[CommunityReportResponse])
 def get_reports() -> List[CommunityReportResponse]:
@@ -100,10 +106,10 @@ def get_reports() -> List[CommunityReportResponse]:
             rows = cursor.fetchall()
             return [CommunityReportResponse(**dict(row)) for row in rows]
 
+
 @router.post("/verify/{report_id}", response_model=CommunityReportResponse)
 def verify_threat(
-    report_id: int,
-    current_user: UserOut = Depends(get_current_user)
+    report_id: int, current_user: UserOut = Depends(get_current_user)
 ) -> CommunityReportResponse:
     """
     Allows a signed-in user to verify a community reported threat, immediately promoting it to a 'verified_threat'.
@@ -114,7 +120,7 @@ def verify_threat(
                 """
                 SELECT id FROM community_reports WHERE id = %s
                 """,
-                (report_id,)
+                (report_id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -128,7 +134,7 @@ def verify_threat(
                 WHERE id = %s
                 RETURNING id, user_id, indicator_type, indicator_value, description, reports_count, status, created_at
                 """,
-                (report_id,)
+                (report_id,),
             )
             updated_row = cursor.fetchone()
             connection.commit()

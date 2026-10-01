@@ -11,11 +11,13 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 DATABASE_URL = os.getenv(
     "CYBERGUARDIAN_DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/cyberguardian",
+    "postgresql://postgres:password@localhost:5432/cyberguardianai",
 )
+
 
 def now_ts() -> int:
     return int(datetime.now(timezone.utc).timestamp())
+
 
 @contextmanager
 def db_connection() -> Iterator[psycopg2.extensions.connection]:
@@ -25,6 +27,7 @@ def db_connection() -> Iterator[psycopg2.extensions.connection]:
         yield connection
     finally:
         connection.close()
+
 
 def initialize_database() -> None:
     with db_connection() as connection:

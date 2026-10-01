@@ -1,8 +1,11 @@
 from typing import Optional, Dict, Any
 from psycopg2.extras import RealDictCursor
-from backend.database.connection import db_connection
+from database.connection import db_connection
 
-def check_community_reputation(indicator: str, indicator_type: str) -> Optional[Dict[str, Any]]:
+
+def check_community_reputation(
+    indicator: str, indicator_type: str
+) -> Optional[Dict[str, Any]]:
     """
     Checks if a URL or message has been reported as a threat in the community database.
     """
@@ -29,7 +32,7 @@ def check_community_reputation(indicator: str, indicator_type: str) -> Optional[
                 )
                 LIMIT 1
                 """,
-                (indicator_type, cleaned, f"%{cleaned}%", cleaned)
+                (indicator_type, cleaned, f"%{cleaned}%", cleaned),
             )
             row = cursor.fetchone()
             if row:

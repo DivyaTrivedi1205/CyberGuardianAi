@@ -5,6 +5,52 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from scipy.ndimage import laplace
 from sklearn.ensemble import RandomForestClassifier
+import torch
+import torch.nn as nn
+
+
+class DeepfakeCNN(nn.Module):
+    """
+    CNN architecture matching the trained deepfake_cnn.pth weights.
+    Architecture:
+    - Conv2d(3, 16, 3x3, padding=1) -> BatchNorm2d(16) -> ReLU -> MaxPool2d(2)
+    - Conv2d(16, 32, 3x3, padding=1) -> BatchNorm2d(32) -> ReLU -> MaxPool2d(2)
+    - Conv2d(32, 64, 3x3, padding=1) -> BatchNorm2d(64) -> ReLU -> AdaptiveAvgPool2d(1)
+    - Linear(64, 32) -> ReLU -> Dropout(0.5) -> Linear(32, 2)
+    """
+
+    def __init__(self, num_classes: int = 2):
+        super().__init__()
+        self.features = nn.Sequential(
+            # Block 1
+            nn.Conv2d(3, 16, kernel_size=3, padding=1, bias=True),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            # Block 2
+            nn.Conv2d(16, 32, kernel_size=3, padding=1, bias=True),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            # Block 3
+            nn.Conv2d(32, 64, kernel_size=3, padding=1, bias=True),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d((1, 1)),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(64, 32),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(32, num_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
 
 # Synthetic image generator helper for training
 def generate_synthetic_image_bytes(is_fake: bool) -> bytes:

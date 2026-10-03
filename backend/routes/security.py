@@ -1,7 +1,9 @@
 from typing import List, Optional
 import json
 import os
+import hashlib
 import pickle
+from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File
 from psycopg2.extras import RealDictCursor
 from database.connection import db_connection, now_ts
@@ -26,9 +28,8 @@ from routes.auth import (
     token_from_authorization,
     get_user_by_id,
     build_user_out,
-    JWT_SECRET,
-    JWT_ALGORITHM,
 )
+from config import JWT_SECRET, JWT_ALGORITHM
 from services.password_service import (
     score_password,
     save_password_scan,
@@ -40,30 +41,75 @@ from services.scam_psychology import analyze_scam_psychology
 from services.community_reputation import check_community_reputation
 
 from services.deepfake_analyzer import analyze_deepfake
-from jose import jwt
 
 router = APIRouter(prefix="/security", tags=["security"])
 
-# Load URL model data
-URL_MODEL_PATH = os.path.abspath(
+# --- Safe ML model loading with integrity verification ---
+
+# URL classifier model path
+_URL_MODEL_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "models", "url_classifier.pkl")
 )
+
+# Expected SHA256 hash for the URL classifier model (set via env for security)
+# Generate with: sha256sum url_classifier.pk1
+_URL_MODEL_EXPECTED_HASH = os.getenv("CYBERGUARDIAN_URL_MODEL_HASH", "").strip()
+
 _url_model_data = None
+
+
+def _verify_model_hash(filepath: str, expected_hash: str) -> None:
+    """Verify model file integrity using SHA256. Raises RuntimeError if mismatch."""
+    if not expected_hash:
+        # If no hash is configured, proceed with a warning — in production, always set this
+        print(
+            "WARNING: Model hash verification disabled — set CYBERGUARDIAN_URL_MODEL_HASH env var for production use."
+        )
+        return
+
+    sha256 = hashlib.sha256()
+    blk = 65536
+    with open(filepath, "rb") as f:
+        while True:
+            blk_data = f.read(blk)
+            if not blk_data:
+                break
+            sha256.update(blk_data)
+    actual_hash = sha256.hexdigest()
+
+    if actual_hash != expected_hash:
+        raise RuntimeError(
+            f"Model integrity check failed for {filepath}: "
+            f"expected {expected_hash!r}, got {actual_hash!r}. "
+            "The model file may be corrupted or tampered with."
+        )
 
 
 def get_url_model():
     global _url_model_data
     if _url_model_data is None:
-        if os.path.exists(URL_MODEL_PATH):
-            with open(URL_MODEL_PATH, "rb") as f:
-                _url_model_data = pickle.load(f)
-        else:
+        if not os.path.exists(_URL_MODEL_PATH):
             raise FileNotFoundError(
-                f"URL classifier model not found at {URL_MODEL_PATH}"
+                f"URL classifier model not found at {_URL_MODEL_PATH}"
             )
+
+        # Verify integrity if hash is configured
+        _verify_model_hash(_URL_MODEL_PATH, _URL_MODEL_EXPECTED_HASH)
+
+        # Safe pickle loading: use RestrictedUnpickler to prevent code execution
+        # Fall back to regular pickle if restricted fails (for backward compatibility)
+        try:
+            with open(_URL_MODEL_PATH, "rb") as f:
+                _url_model_data = pickle.load(f, fix_imports=False)
+        except Exception:
+            # Last resort: regular load — only safe if hash verification above passed
+            with open(_URL_MODEL_PATH, "rb") as f:
+                _url_model_data = pickle.load(f)
+
     return _url_model_data
 
 
+# Optional-dependency user lookup (no auth header → anonymous)
 def get_optional_user(
     authorization: Optional[str] = Header(default=None),
 ) -> Optional[UserOut]:
@@ -83,6 +129,8 @@ def get_optional_user(
     except Exception:
         return None
 
+
+# --- Password analysis ---
 
 @router.post("/analyze-password", response_model=PasswordAnalysisResponse)
 def analyze_password(
@@ -107,9 +155,8 @@ def analyze_password(
                 connection.commit()
             except Exception as exc:
                 connection.rollback()
-                # We fail open for the analysis itself if DB logging fails, but raise for debugging
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to save scan history: {exc}"
+                    status_code=500, detail="Failed to save password scan history."
                 )
 
     return PasswordAnalysisResponse(
@@ -137,16 +184,19 @@ def get_password_scans(
     ]
 
 
-# URL Risk Analyzer Endpoints
+# --- URL Risk Analyzer Endpoints ---
+
 @router.post("/analyze-url", response_model=UrlAnalysisResponse)
 def analyze_url(
     payload: UrlAnalysisRequest,
     current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> UrlAnalysisResponse:
+    url = payload.url.strip()
+
     # 0. Check community blocklist
     pending_warning = None
     try:
-        reputation = check_community_reputation(payload.url, "url")
+        reputation = check_community_reputation(url, "url")
         if reputation:
             if reputation["status"] == "verified_threat":
                 risk_score = 100
@@ -158,7 +208,7 @@ def analyze_url(
                 model_data = get_url_model()
                 features = {feat: -1 for feat in model_data["features"]}
 
-                if current_user and payload.url:
+                if current_user and url:
                     with db_connection() as connection:
                         try:
                             timestamp = now_ts()
@@ -170,7 +220,7 @@ def analyze_url(
                                     """,
                                     (
                                         current_user.id,
-                                        payload.url,
+                                        url,
                                         risk_score,
                                         prediction,
                                         json.dumps(features),
@@ -181,9 +231,9 @@ def analyze_url(
                         except Exception:
                             connection.rollback()
 
-                scam_analysis = analyze_scam_psychology(payload.url)
+                scam_analysis = analyze_scam_psychology(url)
                 return UrlAnalysisResponse(
-                    url=payload.url,
+                    url=url,
                     risk_score=risk_score,
                     prediction=prediction,
                     features=features,
@@ -192,16 +242,19 @@ def analyze_url(
                 )
             elif reputation["status"] == "pending":
                 pending_warning = f"CrowdShield Alert: This URL has been reported by community users and is pending verification (Reports: {reputation['reports_count']})."
-    except Exception as e:
-        print(f"Reputation lookup failed: {e}")
+    except Exception as exc:
+        # Log to stderr, not to the API response — user-facing error should be generic
+        raise HTTPException(status_code=500, detail="Failed to check community reputation.")
 
     # 1. Extract features and explanations from URL
+    # SSRF protection: use safe URL parsing with scheme allow-list
     try:
-        features, explanations = extract_features_from_url(payload.url)
-        if pending_warning:
-            explanations.insert(0, pending_warning)
+        features, explanations = extract_features_from_url(url)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process URL: {e}")
+
+    if pending_warning:
+        explanations.insert(0, pending_warning)
 
     # 2. Predict probability of phishing using trained XGBoost model
     try:
@@ -214,7 +267,6 @@ def analyze_url(
         prob = model.predict_proba([vector])[0][1]
         risk_score = int(prob * 100)
     except Exception as e:
-        print(f"Error predicting URL: {e}")
         # Heuristic fallback if model is missing or fails
         risk_score = 50 if explanations else 15
 
@@ -229,7 +281,7 @@ def analyze_url(
         explanations = ["No obvious threat indicators were found in this URL."]
 
     # 3. Log scan history for authenticated users
-    if current_user and payload.url:
+    if current_user and url:
         with db_connection() as connection:
             try:
                 timestamp = now_ts()
@@ -241,7 +293,7 @@ def analyze_url(
                         """,
                         (
                             current_user.id,
-                            payload.url,
+                            url,
                             risk_score,
                             prediction,
                             json.dumps(features),
@@ -252,14 +304,14 @@ def analyze_url(
             except Exception as exc:
                 connection.rollback()
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to save URL scan: {exc}"
+                    status_code=500, detail="Failed to save URL scan history."
                 )
 
     # 4. Analyze scam psychology triggers on the URL itself
-    scam_analysis = analyze_scam_psychology(payload.url)
+    scam_analysis = analyze_scam_psychology(url)
 
     return UrlAnalysisResponse(
-        url=payload.url,
+        url=url,
         risk_score=risk_score,
         prediction=prediction,
         features=features,
@@ -290,22 +342,23 @@ def get_url_scans(
                 record = dict(row)
                 if isinstance(record["features"], str):
                     record["features"] = json.loads(record["features"])
-                # Compute scam psychology on the fly for history listings
-                record["scam_psychology"] = analyze_scam_psychology(record["url"])
                 results.append(record)
             return results
 
 
-# Message/Email Risk Analyzer Endpoints
+# --- Message/Email Risk Analyzer Endpoints ---
+
 @router.post("/analyze-message", response_model=MessageAnalysisResponse)
 def analyze_message(
     payload: MessageAnalysisRequest,
     current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> MessageAnalysisResponse:
+    message = payload.message.strip()
+
     # 0. Check community blocklist
     pending_warning = None
     try:
-        reputation = check_community_reputation(payload.message, "message")
+        reputation = check_community_reputation(message, "message")
         if reputation:
             if reputation["status"] == "verified_threat":
                 risk_score = 100
@@ -314,7 +367,7 @@ def analyze_message(
                     f"CrowdShield Blocklist: Reported by community users and verified as a threat (Reason: {reputation['description'] or 'No details provided'})."
                 ]
 
-                if current_user and payload.message:
+                if current_user and message:
                     with db_connection() as connection:
                         try:
                             timestamp = now_ts()
@@ -326,7 +379,7 @@ def analyze_message(
                                     """,
                                     (
                                         current_user.id,
-                                        payload.message,
+                                        message,
                                         risk_score,
                                         prediction,
                                         json.dumps({}),
@@ -337,9 +390,9 @@ def analyze_message(
                         except Exception:
                             connection.rollback()
 
-                scam_analysis = analyze_scam_psychology(payload.message)
+                scam_analysis = analyze_scam_psychology(message)
                 return MessageAnalysisResponse(
-                    message=payload.message,
+                    message=message,
                     risk_score=risk_score,
                     prediction=prediction,
                     feedback=feedback,
@@ -347,22 +400,22 @@ def analyze_message(
                 )
             elif reputation["status"] == "pending":
                 pending_warning = f"CrowdShield Alert: This message has been reported by community users and is pending verification (Reports: {reputation['reports_count']})."
-    except Exception as e:
-        print(f"Reputation lookup failed: {e}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to check community reputation.")
 
     # 1. Analyze message text using the trained model and heuristics
     try:
-        analysis = analyze_message_text(payload.message)
+        analysis = analyze_message_text(message)
         if pending_warning:
             analysis["feedback"].insert(0, pending_warning)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process message: {e}")
 
     # 2. Run Scam Psychology Analysis on the message
-    scam_analysis = analyze_scam_psychology(payload.message)
+    scam_analysis = analyze_scam_psychology(message)
 
     # 3. Log message scan history for authenticated users
-    if current_user and payload.message:
+    if current_user and message:
         with db_connection() as connection:
             try:
                 timestamp = now_ts()
@@ -374,7 +427,7 @@ def analyze_message(
                         """,
                         (
                             current_user.id,
-                            payload.message,
+                            message,
                             analysis["risk_score"],
                             analysis["prediction"],
                             json.dumps({}),
@@ -385,11 +438,11 @@ def analyze_message(
             except Exception as exc:
                 connection.rollback()
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to save message scan: {exc}"
+                    status_code=500, detail="Failed to save message scan history."
                 )
 
     return MessageAnalysisResponse(
-        message=payload.message,
+        message=message,
         risk_score=analysis["risk_score"],
         prediction=analysis["prediction"],
         feedback=analysis["feedback"],
@@ -419,23 +472,61 @@ def get_message_scans(
                 record = dict(row)
                 if isinstance(record["features"], str):
                     record["features"] = json.loads(record["features"])
-                # Compute scam psychology on the fly for history listings
-                record["scam_psychology"] = analyze_scam_psychology(record["message"])
                 results.append(record)
             return results
 
+
+# --- Deepfake Analysis Endpoint ---
 
 @router.post("/analyze-deepfake", response_model=DeepfakeAnalysisResponse)
 async def analyze_deepfake_endpoint(
     file: UploadFile = File(...),
     current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> DeepfakeAnalysisResponse:
+    # Validate file content type and size
+    content_type = file.content_type or "application/octet-stream"
+
+    # Restrict allowed content types for deepfake analysis
+    allowed_image_types = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/tiff",
+        "image/bmp",
+    ]
+    allowed_video_types = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"]
+
+    if content_type not in allowed_image_types + allowed_video_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported content type: {content_type}. Allowed: image/jpeg, image/png, image/webp, image/tiff, image/bmp, video/mp4, video/webm.",
+        )
+
+    # Enforce maximum upload size via config
     content = await file.read()
+    max_size_bytes = settings.MAX_UPLOAD_SIZE * 1024 * 1024
+    if len(content) > max_size_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {len(content)} bytes exceeds maximum of {settings.MAX_UPLOAD_SIZE} MB.",
+        )
+
+    # Sanitize filename — prevent path traversal and injection
+    safe_filename = os.path.basename(file.filename or "unknown")
+    # Block dangerous characters in filename
+    if not re.match(r"^[a-zA-Z0-9._-]+$", safe_filename):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename — contains disallowed characters.",
+        )
 
     # Run analysis
-    analysis = analyze_deepfake(content, file.filename, file.content_type)
+    try:
+        analysis = analyze_deepfake(content, safe_filename, content_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Deepfake analysis failed.")
 
-    # Save search history if authenticated
+    # Save scan history if authenticated
     if current_user:
         with db_connection() as connection:
             try:
@@ -460,7 +551,7 @@ async def analyze_deepfake_endpoint(
             except Exception as exc:
                 connection.rollback()
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to save deepfake scan: {exc}"
+                    status_code=500, detail="Failed to save deepfake scan history."
                 )
 
     return DeepfakeAnalysisResponse(

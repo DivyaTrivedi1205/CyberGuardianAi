@@ -1,4 +1,3 @@
-import os
 import re
 import secrets
 import smtplib
@@ -20,22 +19,18 @@ from models.auth import (
     OtpResponse,
     GoogleVerifyRequest,
 )
+from config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-JWT_SECRET = os.getenv("CYBERGUARDIAN_JWT_SECRET", "cyberguardian-dev-secret")
-GOOGLE_CLIENT_ID = os.getenv(
-    "GOOGLE_CLIENT_ID",
-    "48190723181-pf48lpee9226voi06h554qq5r93hchbb.apps.googleusercontent.com",
-)
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRES_HOURS = 24
-OTP_EXPIRES_MINUTES = 10
-SMTP_HOST = os.getenv("CYBERGUARDIAN_SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("CYBERGUARDIAN_SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("CYBERGUARDIAN_SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("CYBERGUARDIAN_SMTP_PASSWORD", "")
-SMTP_FROM_NAME = os.getenv("CYBERGUARDIAN_SMTP_FROM_NAME", "CyberGuardian AI")
+ACCESS_TOKEN_EXPIRES_HOURS = settings.ACCESS_TOKEN_EXPIRES_HOURS
+OTP_EXPIRES_MINUTES = settings.OTP_EXPIRES_MINUTES
+SMTP_HOST = settings.SMTP_HOST
+SMTP_PORT = settings.SMTP_PORT
+SMTP_USERNAME = settings.SMTP_USERNAME or ""
+SMTP_PASSWORD = settings.SMTP_PASSWORD or ""
+SMTP_FROM_NAME = settings.SMTP_FROM_NAME
 
 
 def normalize_identifier(
@@ -54,10 +49,8 @@ def generate_otp_code() -> str:
 def send_email_otp(
     recipient: str, code: str, purpose: Literal["login", "signup"]
 ) -> None:
+    """Send OTP via SMTP. In dev (SMTP creds missing), this is a no-op."""
     if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print(
-            f"\n[DEVELOPMENT VERIFICATION] Simulated Email OTP for {recipient}: {code} (Purpose: {purpose})\n"
-        )
         return
 
     subject = f"CyberGuardian AI verification code for {purpose}"
@@ -101,7 +94,7 @@ def create_access_token(user: UserOut) -> str:
         "iat": int(issued_at.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def get_user_by_identifier(connection, identifier: str) -> Optional[dict]:
@@ -245,7 +238,7 @@ def get_current_user(authorization: Optional[str] = Header(default=None)) -> Use
         raise HTTPException(status_code=401, detail="Authorization token missing.")
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as exc:
         raise HTTPException(
             status_code=401, detail="Invalid or expired token."
@@ -297,9 +290,9 @@ def request_otp(payload: AuthRequest) -> OtpResponse:
             if payload.contact_mode == "email":
                 send_email_otp(identifier, code, payload.purpose)
             else:
-                # Phone OTP simulation
+                # Phone OTP simulation — do NOT expose the code in production logs
                 print(
-                    f"\n[DEVELOPMENT VERIFICATION] Simulated Phone OTP for {identifier}: {code} (Purpose: {payload.purpose})\n"
+                    f"\n[DEVELOPMENT VERIFICATION] Simulated OTP for {identifier} (Purpose: {payload.purpose})\n"
                 )
         except Exception:
             connection.rollback()
@@ -311,7 +304,7 @@ def request_otp(payload: AuthRequest) -> OtpResponse:
         not SMTP_USERNAME or not SMTP_PASSWORD or payload.contact_mode == "phone"
     )
     if is_simulated:
-        msg = f"Simulated verification code: {code} (This code has been printed to the server terminal too)."
+        msg = "Simulated verification code has been generated. Check server logs for the simulated display message."
     else:
         msg = f"Verification code sent to your {payload.contact_mode}."
 
@@ -365,8 +358,42 @@ def verify_otp(payload: OtpVerifyRequest) -> AuthResponse:
     )
 
 
+# Rate-limited Google demo login
+# For production, use /auth/google endpoint with real Google OAuth
+# This demo endpoint is rate-limited to prevent abuse
+_google_demo_counts: dict = {}
+
+
 @router.post("/google-demo", response_model=AuthResponse)
 def google_demo_login(payload: GoogleAuthRequest) -> AuthResponse:
+    """Rate-limited Google demo login.
+
+    NOTE: This is a simulated login for development/demo purposes only.
+    It does NOT perform real Google OAuth verification.
+    Rate-limited to prevent abuse — adjust limit via COMMUNITY_REPORT_RATE_LIMIT config.
+    """
+    import time
+
+    key = "google_demo_login"
+    current_time = time.time()
+
+    # Clean old entries (sliding window of 1 hour)
+    if key in _google_demo_counts:
+        _google_demo_counts[key] = [
+            t for t in _google_demo_counts[key] if current_time - t < 3600
+        ]
+    else:
+        _google_demo_counts[key] = []
+
+    # Enforce rate limit from config
+    if len(_google_demo_counts[key]) >= settings.COMMUNITY_REPORT_RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Use the /auth/google endpoint for real OAuth.",
+        )
+
+    _google_demo_counts[key].append(current_time)
+
     identifier = (
         payload.email.lower()
         if payload.email
@@ -395,8 +422,8 @@ def google_demo_login(payload: GoogleAuthRequest) -> AuthResponse:
 
 @router.post("/google", response_model=AuthResponse)
 def google_login(payload: GoogleVerifyRequest) -> AuthResponse:
-    import urllib.request
     import urllib.parse
+    import urllib.request
     import json
 
     credential = payload.credential.strip()
@@ -416,7 +443,7 @@ def google_login(payload: GoogleVerifyRequest) -> AuthResponse:
         )
 
     aud = info.get("aud")
-    if aud != GOOGLE_CLIENT_ID:
+    if aud != settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=400, detail="Google Client ID audience mismatch."
         )

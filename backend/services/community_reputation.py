@@ -8,6 +8,7 @@ def check_community_reputation(
 ) -> Optional[Dict[str, Any]]:
     """
     Checks if a URL or message has been reported as a threat in the community database.
+    Uses parameterized queries to prevent SQL injection.
     """
     cleaned = indicator.strip()
     if not cleaned:
@@ -19,14 +20,13 @@ def check_community_reputation(
 
     with db_connection() as connection:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            # We check if there's a matching record in the blocklist
-            # Escaping % to %% for psycopg2
+            # Use parameterized queries — no string interpolation
             cursor.execute(
                 """
                 SELECT id, user_id, indicator_type, indicator_value, description, reports_count, status, created_at
                 FROM community_reports
                 WHERE indicator_type = %s AND (
-                    indicator_value = %s OR 
+                    indicator_value = %s OR
                     indicator_value LIKE %s OR
                     %s LIKE '%%' || indicator_value || '%%'
                 )

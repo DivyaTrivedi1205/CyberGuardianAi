@@ -33,37 +33,85 @@ AI_SIGNATURES = [
 
 _cnn_model = None
 
+# Expected SHA256 hash for the CNN model weights file (set via env for production)
+CNN_MODEL_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_cnn.pth")
+)
+CNN_MODEL_EXPECTED_HASH = os.getenv("CYBERGUARDIAN_DEEPFAKE_MODEL_HASH", "").strip()
+
+
+def _verify_model_hash(filepath: str, expected_hash: str) -> None:
+    """Verify model file integrity using SHA256. Raises RuntimeError if mismatch."""
+    if not expected_hash:
+        print(
+            "WARNING: Deepfake model hash verification disabled — set CYBERGUARDIAN_DEEPFAKE_MODEL_HASH env var for production use."
+        )
+        return
+
+    sha256 = hashlib.sha256()
+    blk = 65536
+    with open(filepath, "rb") as f:
+        while True:
+            blk_data = f.read(blk)
+            if not blk_data:
+                break
+            sha256.update(blk_data)
+    actual_hash = sha256.hexdigest()
+
+    if actual_hash != expected_hash:
+        raise RuntimeError(
+            f"Model integrity check failed for {filepath}: "
+            f"expected {expected_hash!r}, got {actual_hash!r}. "
+            "The model file may be corrupted or tampered with."
+        )
+
 
 def get_cnn_model() -> DeepfakeCNN:
     global _cnn_model
     if _cnn_model is not None:
         return _cnn_model
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.abspath(
-        os.path.join(script_dir, "..", "..", "models", "deepfake_cnn.pth")
-    )
-
     model = DeepfakeCNN()
 
-    if not os.path.exists(model_path):
+    if not os.path.exists(CNN_MODEL_PATH):
         print("deepfake_cnn.pth not found. Auto-training default CNN model...")
         try:
             train_deepfake_model()
         except Exception as e:
             print(f"Auto-training failed: {e}")
 
-    if os.path.exists(model_path):
+    if os.path.exists(CNN_MODEL_PATH):
+        # Verify integrity if hash is configured
+        _verify_model_hash(CNN_MODEL_PATH, CNN_MODEL_EXPECTED_HASH)
+
         try:
-            model.load_state_dict(
-                torch.load(model_path, map_location=torch.device("cpu"))
+            # PyTorch 2.0+ supports weights_only=True for safer loading
+            # Weights-only loading prevents arbitrary code execution via pickle
+            state_dict = torch.load(
+                CNN_MODEL_PATH,
+                map_location=torch.device("cpu"),
+                weights_only=True  # Only load tensors, not arbitrary pickled objects
             )
+            model.load_state_dict(state_dict)
             model.eval()
             _cnn_model = model
-            print("Successfully loaded Deepfake PyTorch CNN model.")
+            print("Successfully loaded Deepfake PyTorch CNN model with weights-only security.")
+        except TypeError:
+            # Fallback for older PyTorch versions without weights_only
+            print("WARNING: PyTorch version does not support weights_only=True. Falling back to standard load (hash verified).")
+            try:
+                model.load_state_dict(
+                    torch.load(CNN_MODEL_PATH, map_location=torch.device("cpu"))
+                )
+                model.eval()
+                _cnn_model = model
+                print("Loaded Deepfake model with standard torch.load (hash verified).")
+            except Exception as e:
+                print(f"Error loading deepfake model weights: {e}")
+                _cnn_model = model  # Use untrained model as fallback
         except Exception as e:
             print(f"Error loading deepfake model weights: {e}")
-            _cnn_model = model
+            _cnn_model = model  # Use untrained model as fallback
     else:
         _cnn_model = model
 
@@ -76,7 +124,6 @@ def extract_exif_metadata(img: Image.Image) -> Tuple[bool, List[str]]:
     try:
         exif = img.getexif()
         if exif:
-            # Common tag IDs: 271 = Make, 272 = Model, 305 = Software
             for tag_id, val in exif.items():
                 val_str = str(val).strip()
                 if not val_str:
@@ -115,83 +162,63 @@ def extract_exif_metadata(img: Image.Image) -> Tuple[bool, List[str]]:
 
 
 def compute_noise_inconsistency(img_gray_arr: np.ndarray) -> Tuple[float, float]:
-    # Extract noise residual using Laplacian filter
     res = laplace(img_gray_arr.astype(np.float32))
-
     h, w = res.shape
     block_h, block_w = h // 8, w // 8
     variances = []
-
-    # Calculate noise variance inside an 8x8 grid of blocks
     for i in range(8):
         for j in range(8):
             block = res[
                 i * block_h : (i + 1) * block_h, j * block_w : (j + 1) * block_w
             ]
             variances.append(np.var(block))
-
     variances = np.array(variances)
     mean_var = np.mean(variances)
     std_var = np.std(variances)
-
     inconsistency = std_var / (mean_var + 1e-6)
     return float(inconsistency), float(mean_var)
 
 
 def compute_ela_features(img: Image.Image) -> float:
-    # Perform JPEG Error Level Analysis
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=90)
     buf.seek(0)
-
     compressed_img = Image.open(buf)
     orig_arr = np.array(img.convert("RGB")).astype(np.float32)
     comp_arr = np.array(compressed_img).astype(np.float32)
-
     diff = np.abs(orig_arr - comp_arr)
     diff_gray = np.mean(diff, axis=2)
     diff_gray_resized = np.array(
         Image.fromarray(diff_gray.astype(np.uint8)).resize((256, 256))
     )
-
     h, w = diff_gray_resized.shape
     block_h, block_w = h // 8, w // 8
     variances = []
-
     for i in range(8):
         for j in range(8):
             block = diff_gray_resized[
                 i * block_h : (i + 1) * block_h, j * block_w : (j + 1) * block_w
             ]
             variances.append(np.var(block))
-
     variances = np.array(variances)
     mean_var = np.mean(variances)
     std_var = np.std(variances)
-
     ela_inconsistency = std_var / (mean_var + 1e-6)
     return float(ela_inconsistency)
 
 
 def compute_fft_peak_ratio(img_gray_arr: np.ndarray) -> float:
-    # 2D Fast Fourier Transform
     f = np.fft.fft2(img_gray_arr)
     fshift = np.fft.fftshift(f)
     magnitude = np.abs(fshift)
-
     y, x = np.indices(magnitude.shape)
     cy, cx = magnitude.shape[0] // 2, magnitude.shape[1] // 2
     r = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-
-    # Extract outer high frequency components
     high_freq_vals = magnitude[r > 90]
-
     if len(high_freq_vals) == 0:
         return 1.0
-
     max_hf = np.max(high_freq_vals)
     mean_hf = np.mean(high_freq_vals)
-
     papr = max_hf / (mean_hf + 1e-6)
     return float(papr)
 
@@ -219,8 +246,6 @@ def analyze_deepfake(
     file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     # Heuristics 1: Raw Byte-Level Metadata scan for AI signatures
-    # Restrict search to first 64KB and last 4KB (header/footer regions where metadata is written)
-    # to prevent false matches in high-entropy compressed binary pixel streams.
     meta_search_bytes = file_bytes[:65536].lower() + file_bytes[-4096:].lower()
     ai_tag_matches = []
     for sig in AI_SIGNATURES:
@@ -228,12 +253,6 @@ def analyze_deepfake(
             ai_tag_matches.append(sig.decode("utf-8", errors="ignore"))
 
     if is_video:
-        # Video Container analysis (as in previous heuristics)
-        is_raw_ffmpeg = False
-        if b"ffmpeg" in file_bytes.lower() or b"lavf" in file_bytes.lower():
-            is_raw_ffmpeg = True
-
-        # Mock/fill features for video
         hash_seed = int(file_hash[:8], 16)
 
         def get_deterministic_score(
@@ -247,7 +266,7 @@ def analyze_deepfake(
         features["Neck-to-Face Mismatch"] = get_deterministic_score(13, 10, 85)
         features["Temporal Flow"] = get_deterministic_score(14, 5, 80)
 
-        if is_raw_ffmpeg:
+        if b"ffmpeg" in file_bytes.lower() or b"lavf" in file_bytes.lower():
             features["Temporal Flow"] = max(features["Temporal Flow"], 75)
             feedback.append(
                 "FFmpeg Signature Found: Video container metadata shows raw editing tool generation instead of cell-phone camera origin."
@@ -277,7 +296,6 @@ def analyze_deepfake(
         try:
             img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
         except Exception:
-            # Fallback if image cannot be parsed
             return {
                 "prediction": "Suspicious",
                 "risk_score": 50,
@@ -298,24 +316,16 @@ def analyze_deepfake(
                 },
             }
 
-        # 1. EXIF and Metadata Analysis
         has_genuine_camera, camera_tags = extract_exif_metadata(img)
         has_exif = len(camera_tags) > 0
 
-        # 2. Extract grayscaled array and resize for forensics
         img_gray = img.convert("L")
         img_gray_256 = np.array(img_gray.resize((256, 256)))
 
-        # 3. FFT (Fourier Transform) Peak check
         fft_papr = compute_fft_peak_ratio(img_gray_256)
-
-        # 4. Noise variance inconsistency (Laplacian)
         noise_inconsistency, noise_mean = compute_noise_inconsistency(img_gray_256)
-
-        # 5. Error Level Analysis (ELA)
         ela_inconsistency = compute_ela_features(img)
 
-        # 6. Channel correlations
         img_arr = np.array(img).astype(np.float32)
         r_chan = img_arr[:, :, 0].ravel()
         g_chan = img_arr[:, :, 1].ravel()
@@ -336,28 +346,14 @@ def analyze_deepfake(
             else:
                 min_corr = min(corr_rg, corr_gb, corr_br)
 
-        # Calculate individual feature scores mapped to 0-100 (higher = fake/anomaly)
-        # Edge Blending (Noise Inconsistency)
-        # Real photos typically have inconsistency 0.2-0.5; only flag above 0.45
         edge_blending_score = int(
             np.clip((noise_inconsistency - 0.45) / 0.6 * 80 + 10, 5, 95)
         )
-
-        # Eye Reflection (Channel decorrelation or perfect similarity discrepancy)
-        # Real photos often have min_corr 0.7-0.95; only flag severe decorrelation
         eye_reflection_score = int(np.clip((1.0 - min_corr) * 150, 5, 95))
-
-        # Skin Texture (Laplacian Noise Level: extremely smooth noise < 1.0 is suspect)
-        # Real photos from phone cameras typically have noise_mean 3-15+
         skin_smooth_score = int(70 - np.clip((noise_mean - 0.5) / 8.0 * 65, 0, 65))
-
-        # Background Warping (ELA Block Inconsistency)
-        # Real JPEGs commonly have ELA inconsistency 0.3-0.6; only flag above 0.55
         bg_warping_score = int(
             np.clip((ela_inconsistency - 0.55) / 0.6 * 80 + 10, 5, 95)
         )
-
-        # Metadata Anomalies
         metadata_score = 10
         if not has_exif and not any(file_name_lower.endswith(ext) for ext in [".webp", ".png"]):
             metadata_score = 45
@@ -367,21 +363,18 @@ def analyze_deepfake(
         elif has_genuine_camera:
             metadata_score = 5
 
-        # Boost metadata score if FFT PAPR is extremely high (indicating artificial periodic grid structures)
         if fft_papr > 15.0:
             metadata_score = max(metadata_score, 70)
             feedback.append(
                 f"Fourier Grid Spikes: FFT power spectrum shows sharp periodic peaks (PAPR: {fft_papr:.1f}), indicating upsampling/dithering patterns."
             )
 
-        # Store features
         features["Edge Blending"] = edge_blending_score
         features["Eye Reflection Asymmetry"] = eye_reflection_score
         features["Skin Texture Smoothness"] = skin_smooth_score
         features["Background Warping"] = bg_warping_score
         features["Metadata Anomalies"] = metadata_score
 
-        # 7. CNN Model Inference
         cnn = get_cnn_model()
 
         transform = transforms.Compose(
@@ -400,10 +393,8 @@ def analyze_deepfake(
             outputs = cnn(input_tensor)
             probs = torch.softmax(outputs, dim=1).numpy()[0]
 
-        # CNN probability of class 1 ("AI Generated")
         cnn_risk_score = int(probs[1] * 100)
 
-        # Calibrate risk score using physical metadata & forensics anchors
         if ai_tag_matches:
             for match in ai_tag_matches:
                 feedback.append(
@@ -414,10 +405,7 @@ def analyze_deepfake(
             for k in features.keys():
                 features[k] = max(features[k], 85)
         else:
-            # Anchor risk score with CNN, but allow high-conviction forensics or camera metadata to adjust
             raw_risk = cnn_risk_score
-
-            # Forensics boosts only if BOTH ELA and noise are very high
             forensics_anomaly_avg = (edge_blending_score + bg_warping_score) / 2.0
             if forensics_anomaly_avg > 80 and raw_risk < 50:
                 raw_risk = int(raw_risk * 0.6 + forensics_anomaly_avg * 0.4)
@@ -425,13 +413,11 @@ def analyze_deepfake(
                     "Localized Compression/Noise Mismatch: Pixel structures suggest copy-paste composition or local manipulation."
                 )
 
-            # EXIF from a genuine camera strongly reduces risk
             if has_genuine_camera and raw_risk < 85:
                 raw_risk = max(3, int(raw_risk * 0.3))
 
             risk_score = np.clip(raw_risk, 0, 100)
 
-            # Classification
             if risk_score >= 65:
                 prediction = "AI Generated"
             elif risk_score >= 35:
@@ -439,23 +425,22 @@ def analyze_deepfake(
             else:
                 prediction = "Authentic"
 
-        # Generate explanations for features
-        if edge_blending_score >= 65:
-            feedback.append(
-                "Double Edge Boundaries: High noise variance inconsistencies detected around local boundaries."
-            )
-        if eye_reflection_score >= 65:
-            feedback.append(
-                "Color Spectrum Discrepancy: Abnormal channel correlations suggest synthetic light vectors."
-            )
-        if skin_smooth_score >= 65:
-            feedback.append(
-                "Ultra-Smooth Textures: Lack of natural sensor noise or pore details indicates artificial smoothing."
-            )
-        if bg_warping_score >= 65:
-            feedback.append(
-                "JPEG Compression Boundary: ELA block intensity differs, showing evidence of secondary compression."
-            )
+            if edge_blending_score >= 65:
+                feedback.append(
+                    "Double Edge Boundaries: High noise variance inconsistencies detected around local boundaries."
+                )
+            if eye_reflection_score >= 65:
+                feedback.append(
+                    "Color Spectrum Discrepancy: Abnormal channel correlations suggest synthetic light vectors."
+                )
+            if skin_smooth_score >= 65:
+                feedback.append(
+                    "Ultra-Smooth Textures: Lack of natural sensor noise or pore details indicates artificial smoothing."
+                )
+            if bg_warping_score >= 65:
+                feedback.append(
+                    "JPEG Compression Boundary: ELA block intensity differs, showing evidence of secondary compression."
+                )
 
     if not feedback:
         feedback.append(

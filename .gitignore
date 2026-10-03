@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 venv/
 .env
+backend/.env
 
 # Node
 node_modules/
@@ -20,3 +21,15 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Secrets — never commit credentials
+client_secret_*.json
+backend/client_secret_*.json
+
+# ML Models (binary artifacts)
+models/*.pkl
+models/*.pth
+
+# Database
+*.db
+*.sqlite3

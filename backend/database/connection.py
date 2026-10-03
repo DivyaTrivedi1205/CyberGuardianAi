@@ -9,10 +9,9 @@ from dotenv import load_dotenv
 # Load environment variables from the project root .env
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DATABASE_URL = os.getenv(
-    "CYBERGUARDIAN_DATABASE_URL",
-    "postgresql://postgres:password@localhost:5432/cyberguardianai",
-)
+from config import settings
+
+DATABASE_URL = settings.DATABASE_URL
 
 
 def now_ts() -> int:

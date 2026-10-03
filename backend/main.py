@@ -4,12 +4,16 @@ from database.connection import initialize_database
 from routes.auth import router as auth_router
 from routes.security import router as security_router
 from routes.community import router as community_router
+from config import settings
 
+# FastAPI does not support async def startup() reliably in all versions,
+# so we use the on_event("startup") pattern with the config-aware initializer.
 app = FastAPI(title="CyberGuardian AI API")
 
+# CORS: use configured allowed origins instead of wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

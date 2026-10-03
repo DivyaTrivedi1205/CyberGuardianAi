@@ -41,8 +41,8 @@ def test_url_analysis():
         else:
             prediction = "Legitimate"
 
-        status = "✓" if prediction == expected or (expected == "Phishing" and prediction in ["Phishing", "Suspicious"]) else "✗"
-        print(f"\n{status} URL: {url}")
+        status = "PASS" if prediction == expected or (expected == "Phishing" and prediction in ["Phishing", "Suspicious"]) else "FAIL"
+        print(f"\n[{status}] URL: {url}")
         print(f"   Expected: {expected}, Got: {prediction} (Risk: {risk_score})")
         if explanations:
             for exp in explanations[:2]:
@@ -62,8 +62,8 @@ def test_message_analysis():
 
     for msg, expected in test_messages:
         analysis = analyze_message_text(msg)
-        status = "✓" if analysis['prediction'] == expected or (expected == "Phishing/Spam" and analysis['prediction'] in ["Phishing/Spam", "Suspicious"]) else "✗"
-        print(f"\n{status} Message: {msg[:60]}...")
+        status = "PASS" if analysis['prediction'] == expected or (expected == "Phishing/Spam" and analysis['prediction'] in ["Phishing/Spam", "Suspicious"]) else "FAIL"
+        print(f"\n[{status}] Message: {msg[:60]}...")
         print(f"   Expected: {expected}, Got: {analysis['prediction']} (Risk: {analysis['risk_score']})")
         for fb in analysis['feedback'][:2]:
             print(f"   - {fb}")

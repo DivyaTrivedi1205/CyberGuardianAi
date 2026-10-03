@@ -1,0 +1,325 @@
+{
+  "generated_at": "2026-10-03T13:40:37.093281",
+  "random_seed": 42,
+  "models": {
+    "url": {
+      "model_name": "URL Phishing",
+      "summary": {
+        "accuracy": 0.9701492537313433,
+        "precision": 0.9740663900414938,
+        "recall": 0.9581632653061225,
+        "f1_score": 0.9660493827160493,
+        "roc_auc": 0.996059284802467,
+        "pr_auc": 0.9957124577600573
+      },
+      "samples": {
+        "total": 0,
+        "train": 0,
+        "class_distribution": {
+          "total_samples": 2211,
+          "class_counts": {
+            "Legitimate": 1231,
+            "Phishing": 980
+          },
+          "class_percentages": {
+            "Legitimate": 55.67616463138852,
+            "Phishing": 44.32383536861148
+          },
+          "dominant_class": "Legitimate",
+          "minority_class": "Phishing",
+          "class_balance_ratio": 0.7961007311129163
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9701492537313433,
+        "precision": 0.9740663900414938,
+        "recall": 0.9581632653061225,
+        "f1_score": 0.9660493827160493,
+        "roc_auc": 0.996059284802467,
+        "pr_auc": 0.9957124577600573,
+        "confusion_matrix": [
+          [
+            1206,
+            25
+          ],
+          [
+            41,
+            939
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "Negative",
+          "Positive"
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 0.967121090617482,
+            "recall": 0.9796913078797725,
+            "f1-score": 0.9733656174334141,
+            "support": 1231.0
+          },
+          "1": {
+            "precision": 0.9740663900414938,
+            "recall": 0.9581632653061225,
+            "f1-score": 0.9660493827160493,
+            "support": 980.0
+          },
+          "accuracy": 0.9701492537313433,
+          "macro avg": {
+            "precision": 0.9705937403294879,
+            "recall": 0.9689272865929475,
+            "f1-score": 0.9697075000747317,
+            "support": 2211.0
+          },
+          "weighted avg": {
+            "precision": 0.9701995137000381,
+            "recall": 0.9701492537313433,
+            "f1-score": 0.9701227816021082,
+            "support": 2211.0
+          }
+        }
+      },
+      "metadata": {
+        "evaluation_timestamp": "2026-10-03T08:10:27.853765+00:00",
+        "random_seed": 42,
+        "library_versions": {
+          "sklearn": "1.9.0",
+          "xgboost": "3.4.1",
+          "torch": "2.13.0+cpu",
+          "pandas": "3.0.5",
+          "numpy": "2.5.2"
+        },
+        "hostname": "DIVYATRIVEDI12"
+      },
+      "split_config": {
+        "test_size": 0.2,
+        "random_state": 42,
+        "stratify": true
+      },
+      "limitations": [],
+      "dataset": {
+        "name": "phishing_websites",
+        "source": "Kaggle/UEF-SASL Phishing Websites Dataset",
+        "features": 30,
+        "samples": 0
+      }
+    },
+    "message": {
+      "model_name": "Message Spam",
+      "summary": {
+        "accuracy": 0.9766816143497757,
+        "precision": 1.0,
+        "recall": 0.825503355704698,
+        "f1_score": 0.9044117647058824,
+        "roc_auc": 0.9888907415898953,
+        "pr_auc": 0.973753766157449
+      },
+      "samples": {
+        "total": 0,
+        "train": 0,
+        "class_distribution": {
+          "total_samples": 1115,
+          "class_counts": {
+            "Ham (Legitimate)": 966,
+            "Spam (Phishing)": 149
+          },
+          "class_percentages": {
+            "Ham (Legitimate)": 86.63677130044843,
+            "Spam (Phishing)": 13.363228699551568
+          },
+          "dominant_class": "Ham (Legitimate)",
+          "minority_class": "Spam (Phishing)",
+          "class_balance_ratio": 0.15424430641821946
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9766816143497757,
+        "precision": 1.0,
+        "recall": 0.825503355704698,
+        "f1_score": 0.9044117647058824,
+        "roc_auc": 0.9888907415898953,
+        "pr_auc": 0.973753766157449,
+        "confusion_matrix": [
+          [
+            966,
+            0
+          ],
+          [
+            26,
+            123
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "Negative",
+          "Positive"
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 0.9737903225806451,
+            "recall": 1.0,
+            "f1-score": 0.9867211440245148,
+            "support": 966.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 0.825503355704698,
+            "f1-score": 0.9044117647058824,
+            "support": 149.0
+          },
+          "accuracy": 0.9766816143497757,
+          "macro avg": {
+            "precision": 0.9868951612903225,
+            "recall": 0.912751677852349,
+            "f1-score": 0.9455664543651986,
+            "support": 1115.0
+          },
+          "weighted avg": {
+            "precision": 0.9772927817156082,
+            "recall": 0.9766816143497757,
+            "f1-score": 0.9757219534249845,
+            "support": 1115.0
+          }
+        }
+      },
+      "metadata": {
+        "evaluation_timestamp": "2026-10-03T08:10:27.981042+00:00",
+        "random_seed": 42,
+        "library_versions": {
+          "sklearn": "1.9.0",
+          "xgboost": "3.4.1",
+          "torch": "2.13.0+cpu",
+          "pandas": "3.0.5",
+          "numpy": "2.5.2"
+        },
+        "hostname": "DIVYATRIVEDI12"
+      },
+      "split_config": {
+        "test_size": 0.2,
+        "random_state": 42,
+        "stratify": true
+      },
+      "limitations": [],
+      "dataset": {
+        "name": "sms_spam_collection",
+        "source": "SMS Spam Collection v.1 (Almeida et al.)",
+        "vocabulary_size": 0,
+        "samples": 0
+      }
+    },
+    "deepfake": {
+      "model_name": "Deepfake Detection",
+      "summary": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "roc_auc": 1.0,
+        "pr_auc": 1.0
+      },
+      "samples": {
+        "total": 0,
+        "train": 0,
+        "class_distribution": {
+          "total_samples": 200,
+          "class_counts": {
+            "Authentic (Real)": 100,
+            "AI Generated (Fake)": 100
+          },
+          "class_percentages": {
+            "Authentic (Real)": 50.0,
+            "AI Generated (Fake)": 50.0
+          },
+          "dominant_class": "Authentic (Real)",
+          "minority_class": "Authentic (Real)",
+          "class_balance_ratio": 1.0
+        }
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "roc_auc": 1.0,
+        "pr_auc": 1.0,
+        "confusion_matrix": [
+          [
+            100,
+            0
+          ],
+          [
+            0,
+            100
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "Negative",
+          "Positive"
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 100.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 100.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 200.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 200.0
+          }
+        }
+      },
+      "metadata": {
+        "evaluation_timestamp": "2026-10-03T08:10:37.066066+00:00",
+        "random_seed": 42,
+        "library_versions": {
+          "sklearn": "1.9.0",
+          "xgboost": "3.4.1",
+          "torch": "2.13.0+cpu",
+          "pandas": "3.0.5",
+          "numpy": "2.5.2"
+        },
+        "hostname": "DIVYATRIVEDI12"
+      },
+      "split_config": {
+        "num_samples": 400,
+        "train_ratio": 0.5,
+        "random_state": 42
+      },
+      "limitations": [],
+      "dataset": {
+        "name": "synthetic_forensics",
+        "source": "Synthetic patterns generated during training",
+        "note": "Model trained on synthetic patterns; real-world performance may vary",
+        "samples": 0
+      }
+    }
+  },
+  "comparison_table": "| Model              | Accuracy | Precision | Recall   | F1-Score | ROC-AUC  |\n|--------------------|----------|-----------|----------|----------|----------|\n| URL                |    97.01% |     97.41% |    95.82% |    96.60% | 99.61%   |\n| MESSAGE            |    97.67% |    100.00% |    82.55% |    90.44% | 98.89%   |\n| DEEPFAKE           |   100.00% |    100.00% |   100.00% |   100.00% | 100.00%  |",
+  "limitations": {
+    "url": [
+      "The URL model is trained on a specific phishing dataset. Performance on novel phishing techniques may vary."
+    ],
+    "message": [
+      "The message model is trained on SMS spam data. Performance on other message types (email, social media) may vary."
+    ],
+    "deepfake": [
+      "The deepfake model is trained on SYNTHETIC patterns, not real-world data. The current implementation serves as a proof-of-concept but may not generalize to actual deepfake images or videos.",
+      "The evaluation uses the same synthetic generator as training, which may lead to inflated performance metrics."
+    ]
+  }
+}

@@ -1,0 +1,83 @@
+======================================================================
+CYBERGUARDIAN AI - ML EVALUATION REPORT
+======================================================================
+Generated: 2026-10-03 13:40:37
+Random Seed: 42
+
+----------------------------------------------------------------------
+URL Phishing Model
+----------------------------------------------------------------------
+Dataset: phishing_websites
+Source: Kaggle/UEF-SASL Phishing Websites Dataset
+Samples: 0
+
+Metrics:
+| Metric              | Value           |
+|---------------------|-----------------|
+| Accuracy            |          97.01% |
+| Precision           |          97.41% |
+| Recall              |          95.82% |
+| F1-Score            |          96.60% |
+| ROC-AUC             |          99.61% |
+| PR-AUC              |          99.57% |
+
+Confusion Matrix:
+|                  | Predicted Negative   | Predicted Positive   |
+|------------------|---------------------------|---------------------------|
+| Actual Negative   |                  1206 |                    25 |
+| Actual Positive   |                    41 |                   939 |
+
+----------------------------------------------------------------------
+Message Spam Model
+----------------------------------------------------------------------
+Dataset: sms_spam_collection
+Source: SMS Spam Collection v.1 (Almeida et al.)
+Samples: 0
+
+Metrics:
+| Metric              | Value           |
+|---------------------|-----------------|
+| Accuracy            |          97.67% |
+| Precision           |         100.00% |
+| Recall              |          82.55% |
+| F1-Score            |          90.44% |
+| ROC-AUC             |          98.89% |
+| PR-AUC              |          97.38% |
+
+Confusion Matrix:
+|                  | Predicted Negative   | Predicted Positive   |
+|------------------|---------------------------|---------------------------|
+| Actual Negative   |                   966 |                     0 |
+| Actual Positive   |                    26 |                   123 |
+
+----------------------------------------------------------------------
+Deepfake Detection Model
+----------------------------------------------------------------------
+Dataset: synthetic_forensics
+Source: Synthetic patterns generated during training
+Samples: 0
+
+Metrics:
+| Metric              | Value           |
+|---------------------|-----------------|
+| Accuracy            |         100.00% |
+| Precision           |         100.00% |
+| Recall              |         100.00% |
+| F1-Score            |         100.00% |
+| ROC-AUC             |         100.00% |
+| PR-AUC              |         100.00% |
+
+Confusion Matrix:
+|                  | Predicted Negative   | Predicted Positive   |
+|------------------|---------------------------|---------------------------|
+| Actual Negative   |                   100 |                     0 |
+| Actual Positive   |                     0 |                   100 |
+
+======================================================================
+CROSS-MODEL COMPARISON
+======================================================================
+| Model              | Accuracy | Precision | Recall   | F1-Score | ROC-AUC  |
+|--------------------|----------|-----------|----------|----------|----------|
+| URL                |    97.01% |     97.41% |    95.82% |    96.60% | 99.61%   |
+| MESSAGE            |    97.67% |    100.00% |    82.55% |    90.44% | 98.89%   |
+| DEEPFAKE           |   100.00% |    100.00% |   100.00% |   100.00% | 100.00%  |

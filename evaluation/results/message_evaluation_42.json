@@ -1,0 +1,124 @@
+{
+  "model": "TFIDF_LogisticRegression",
+  "dataset": {
+    "name": "sms_spam_collection",
+    "samples": 5574
+  },
+  "metrics": {
+    "model_name": "TFIDF_LogisticRegression",
+    "model_version": "original",
+    "model_hash": "unknown",
+    "vocabulary_size": 5000,
+    "vocabulary_max_features": 5000,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "stop_words": "english",
+    "class_distribution": {
+      "full_dataset": {
+        "total_samples": 5574,
+        "class_counts": {
+          "Ham (Legitimate)": 4827,
+          "Spam (Phishing)": 747
+        },
+        "class_percentages": {
+          "Ham (Legitimate)": 86.59849300322928,
+          "Spam (Phishing)": 13.40150699677072
+        },
+        "dominant_class": "Ham (Legitimate)",
+        "minority_class": "Spam (Phishing)",
+        "class_balance_ratio": 0.15475450590428838
+      },
+      "test_set": {
+        "total_samples": 1115,
+        "class_counts": {
+          "Ham (Legitimate)": 966,
+          "Spam (Phishing)": 149
+        },
+        "class_percentages": {
+          "Ham (Legitimate)": 86.63677130044843,
+          "Spam (Phishing)": 13.363228699551568
+        },
+        "dominant_class": "Ham (Legitimate)",
+        "minority_class": "Spam (Phishing)",
+        "class_balance_ratio": 0.15424430641821946
+      }
+    },
+    "split_config": {
+      "test_size": 0.2,
+      "random_state": 42,
+      "stratify": true
+    },
+    "metrics": {
+      "accuracy": 0.9766816143497757,
+      "precision": 1.0,
+      "recall": 0.825503355704698,
+      "f1_score": 0.9044117647058824,
+      "roc_auc": 0.9888907415898953,
+      "pr_auc": 0.973753766157449,
+      "confusion_matrix": [
+        [
+          966,
+          0
+        ],
+        [
+          26,
+          123
+        ]
+      ],
+      "confusion_matrix_labels": [
+        "Negative",
+        "Positive"
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.9737903225806451,
+          "recall": 1.0,
+          "f1-score": 0.9867211440245148,
+          "support": 966.0
+        },
+        "1": {
+          "precision": 1.0,
+          "recall": 0.825503355704698,
+          "f1-score": 0.9044117647058824,
+          "support": 149.0
+        },
+        "accuracy": 0.9766816143497757,
+        "macro avg": {
+          "precision": 0.9868951612903225,
+          "recall": 0.912751677852349,
+          "f1-score": 0.9455664543651986,
+          "support": 1115.0
+        },
+        "weighted avg": {
+          "precision": 0.9772927817156082,
+          "recall": 0.9766816143497757,
+          "f1-score": 0.9757219534249845,
+          "support": 1115.0
+        }
+      }
+    },
+    "test_samples": 1115,
+    "train_samples": 4459,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    }
+  },
+  "metadata": {
+    "evaluation_timestamp": "2026-10-03T08:10:27.981042+00:00",
+    "random_seed": 42,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    },
+    "hostname": "DIVYATRIVEDI12"
+  }
+}

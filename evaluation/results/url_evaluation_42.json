@@ -1,0 +1,149 @@
+{
+  "model": "XGBoost_URL_Classifier",
+  "dataset": {
+    "name": "phishing_websites",
+    "samples": 11055
+  },
+  "metrics": {
+    "model_name": "XGBoost_URL_Classifier",
+    "model_version": "original",
+    "model_hash": "unknown",
+    "feature_names": [
+      "having_IP_Address",
+      "URL_Length",
+      "Shortining_Service",
+      "having_At_Symbol",
+      "double_slash_redirecting",
+      "Prefix_Suffix",
+      "having_Sub_Domain",
+      "SSLfinal_State",
+      "Domain_registeration_length",
+      "Favicon",
+      "port",
+      "HTTPS_token",
+      "Request_URL",
+      "URL_of_Anchor",
+      "Links_in_tags",
+      "SFH",
+      "Submitting_to_email",
+      "Abnormal_URL",
+      "Redirect",
+      "on_mouseover",
+      "RightClick",
+      "popUpWidnow",
+      "Iframe",
+      "age_of_domain",
+      "DNSRecord",
+      "web_traffic",
+      "Page_Rank",
+      "Google_Index",
+      "Links_pointing_to_page",
+      "Statistical_report"
+    ],
+    "class_distribution": {
+      "full_dataset": {
+        "total_samples": 11055,
+        "class_counts": {
+          "Legitimate": 6157,
+          "Phishing": 4898
+        },
+        "class_percentages": {
+          "Legitimate": 55.69425599276345,
+          "Phishing": 44.30574400723655
+        },
+        "dominant_class": "Legitimate",
+        "minority_class": "Phishing",
+        "class_balance_ratio": 0.7955172973850901
+      },
+      "test_set": {
+        "total_samples": 2211,
+        "class_counts": {
+          "Legitimate": 1231,
+          "Phishing": 980
+        },
+        "class_percentages": {
+          "Legitimate": 55.67616463138852,
+          "Phishing": 44.32383536861148
+        },
+        "dominant_class": "Legitimate",
+        "minority_class": "Phishing",
+        "class_balance_ratio": 0.7961007311129163
+      }
+    },
+    "split_config": {
+      "test_size": 0.2,
+      "random_state": 42,
+      "stratify": true
+    },
+    "metrics": {
+      "accuracy": 0.9701492537313433,
+      "precision": 0.9740663900414938,
+      "recall": 0.9581632653061225,
+      "f1_score": 0.9660493827160493,
+      "roc_auc": 0.996059284802467,
+      "pr_auc": 0.9957124577600573,
+      "confusion_matrix": [
+        [
+          1206,
+          25
+        ],
+        [
+          41,
+          939
+        ]
+      ],
+      "confusion_matrix_labels": [
+        "Negative",
+        "Positive"
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.967121090617482,
+          "recall": 0.9796913078797725,
+          "f1-score": 0.9733656174334141,
+          "support": 1231.0
+        },
+        "1": {
+          "precision": 0.9740663900414938,
+          "recall": 0.9581632653061225,
+          "f1-score": 0.9660493827160493,
+          "support": 980.0
+        },
+        "accuracy": 0.9701492537313433,
+        "macro avg": {
+          "precision": 0.9705937403294879,
+          "recall": 0.9689272865929475,
+          "f1-score": 0.9697075000747317,
+          "support": 2211.0
+        },
+        "weighted avg": {
+          "precision": 0.9701995137000381,
+          "recall": 0.9701492537313433,
+          "f1-score": 0.9701227816021082,
+          "support": 2211.0
+        }
+      }
+    },
+    "test_samples": 2211,
+    "train_samples": 8844,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    }
+  },
+  "metadata": {
+    "evaluation_timestamp": "2026-10-03T08:10:27.853765+00:00",
+    "random_seed": 42,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    },
+    "hostname": "DIVYATRIVEDI12"
+  }
+}

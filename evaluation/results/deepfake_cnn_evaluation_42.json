@@ -1,0 +1,119 @@
+{
+  "model": "Deepfake_CNN",
+  "dataset": {
+    "name": "synthetic_forensics",
+    "samples": 400
+  },
+  "metrics": {
+    "model_name": "Deepfake_CNN",
+    "model_version": "original",
+    "model_hash": "unknown",
+    "architecture": {
+      "conv_blocks": 3,
+      "filters": [
+        16,
+        32,
+        64
+      ],
+      "fc_layers": [
+        64,
+        32
+      ],
+      "dropout": 0.5,
+      "num_classes": 2
+    },
+    "feature_extractor": "CNN (features + classifier)",
+    "classification_layer": "LogisticRegression (trained on CNN features)",
+    "class_distribution": {
+      "test_set": {
+        "total_samples": 200,
+        "class_counts": {
+          "Authentic (Real)": 100,
+          "AI Generated (Fake)": 100
+        },
+        "class_percentages": {
+          "Authentic (Real)": 50.0,
+          "AI Generated (Fake)": 50.0
+        },
+        "dominant_class": "Authentic (Real)",
+        "minority_class": "Authentic (Real)",
+        "class_balance_ratio": 1.0
+      }
+    },
+    "split_config": {
+      "num_samples": 400,
+      "train_ratio": 0.5,
+      "random_state": 42
+    },
+    "metrics": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": [
+        [
+          100,
+          0
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "confusion_matrix_labels": [
+        "Negative",
+        "Positive"
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 100.0
+        },
+        "1": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 100.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 200.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 200.0
+        }
+      }
+    },
+    "test_samples": 200,
+    "train_samples": 200,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    }
+  },
+  "metadata": {
+    "evaluation_timestamp": "2026-10-03T08:10:37.066066+00:00",
+    "random_seed": 42,
+    "library_versions": {
+      "sklearn": "1.9.0",
+      "xgboost": "3.4.1",
+      "torch": "2.13.0+cpu",
+      "pandas": "3.0.5",
+      "numpy": "2.5.2"
+    },
+    "hostname": "DIVYATRIVEDI12"
+  }
+}

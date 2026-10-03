@@ -61,3 +61,19 @@ class DeepfakeScanHistoryItem(BaseModel):
     prediction: str
     features: Dict[str, Any]
     created_at: int
+
+# Password Analysis Schemas - Enhanced with detailed findings
+class PasswordAnalysisRequest(BaseModel):
+    password: str
+
+class PasswordAnalysisResponse(BaseModel):
+    score: int
+    strength: str
+    feedback: List[str]
+    recommendations: List[str]
+    length: int
+    character_classes: Dict[str, int]
+    patterns_detected: List[Dict[str, Any]]
+    common_password: bool
+    entropy_estimate: float
+    crack_time_estimate: Optional[Dict[str, Any]] = None

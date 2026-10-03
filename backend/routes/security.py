@@ -22,6 +22,8 @@ from models.security_schemas import (
     MessageScanHistoryItem,
     DeepfakeAnalysisResponse,
     DeepfakeScanHistoryItem,
+    PasswordAnalysisRequest,
+    PasswordAnalysisResponse,
 )
 from routes.auth import (
     get_current_user,
@@ -34,6 +36,10 @@ from services.password_service import (
     score_password,
     save_password_scan,
     get_password_scans_history,
+)
+from improved_password_service import (
+    analyze_password,
+    format_analysis_for_api
 )
 from services.url_feature_extractor import extract_features_from_url
 from services.message_analyzer import analyze_message_text
@@ -137,8 +143,11 @@ def analyze_password(
     payload: PasswordAnalysisRequest,
     current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> PasswordAnalysisResponse:
-    # Run the scoring service
-    analysis = score_password(payload.password)
+    # Run the improved scoring service
+    analysis = analyze_password(payload.password)
+
+    # Format for API response
+    formatted = format_analysis_for_api(analysis)
 
     # Save the scan history if the user is authenticated and password is not empty
     if current_user and payload.password:
@@ -147,10 +156,10 @@ def analyze_password(
                 save_password_scan(
                     connection,
                     user_id=current_user.id,
-                    password_length=len(payload.password),
-                    score=analysis["score"],
-                    grade=analysis["grade"],
-                    feedback=analysis["feedback"],
+                    password_length=analysis['length'],
+                    score=analysis['score'],
+                    grade=analysis['strength'],
+                    feedback=analysis['findings'] + analysis['recommendations'],
                 )
                 connection.commit()
             except Exception as exc:
@@ -160,7 +169,16 @@ def analyze_password(
                 )
 
     return PasswordAnalysisResponse(
-        score=analysis["score"], grade=analysis["grade"], feedback=analysis["feedback"]
+        score=formatted['score'],
+        strength=formatted['strength'],
+        feedback=formatted['findings'],
+        recommendations=formatted['recommendations'],
+        length=formatted['length'],
+        character_classes=formatted['character_classes'],
+        patterns_detected=formatted['patterns_detected'],
+        common_password=formatted['common_password'],
+        entropy_estimate=formatted['entropy_estimate'],
+        crack_time_estimate=formatted.get('crack_time_estimate')
     )
 
 

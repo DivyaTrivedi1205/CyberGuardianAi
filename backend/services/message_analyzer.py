@@ -4,7 +4,12 @@ import pickle
 import re
 from typing import Dict, Any, List
 
-MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "message_classifier.pkl"))
+# Try improved model first, fall back to original
+IMPROVED_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "message_classifier_improved.pkl"))
+ORIGINAL_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "message_classifier.pkl"))
+
+# Use improved model if available
+MODEL_PATH = IMPROVED_MODEL_PATH if os.path.exists(IMPROVED_MODEL_PATH) else ORIGINAL_MODEL_PATH
 
 # Expected SHA256 hash for model integrity verification (set via env for production)
 MODEL_EXPECTED_HASH = os.getenv("CYBERGUARDIAN_MESSAGE_MODEL_HASH", "").strip()
@@ -51,7 +56,21 @@ def get_message_model():
         # Safe pickle load — restricted unpickler not needed for scikit-learn models,
         # but hash verification ensures the file hasn't been tampered with
         with open(MODEL_PATH, "rb") as f:
-            _model = pickle.load(f, fix_imports=False)
+            model_data = pickle.load(f, fix_imports=False)
+
+        # Handle both old format (single pipeline) and new format (dict with vectorizer/model)
+        if isinstance(model_data, dict):
+            if 'model' in model_data and 'vectorizer' in model_data:
+                # New format: dict with vectorizer and model
+                from sklearn.pipeline import Pipeline
+                _model = Pipeline([
+                    ('tfidf', model_data['vectorizer']),
+                    ('classifier', model_data['model'])
+                ])
+            else:
+                _model = model_data
+        else:
+            _model = model_data
 
     return _model
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T13:40:37.093281",
+  "generated_at": "2026-10-03T14:50:57.724913",
   "random_seed": 42,
   "models": {
     "url": {
@@ -80,7 +80,7 @@
         }
       },
       "metadata": {
-        "evaluation_timestamp": "2026-10-03T08:10:27.853765+00:00",
+        "evaluation_timestamp": "2026-10-03T09:01:11.049071+00:00",
         "random_seed": 42,
         "library_versions": {
           "sklearn": "1.9.0",
@@ -182,7 +182,7 @@
         }
       },
       "metadata": {
-        "evaluation_timestamp": "2026-10-03T08:10:27.981042+00:00",
+        "evaluation_timestamp": "2026-10-03T09:01:11.150629+00:00",
         "random_seed": 42,
         "library_versions": {
           "sklearn": "1.9.0",
@@ -284,7 +284,7 @@
         }
       },
       "metadata": {
-        "evaluation_timestamp": "2026-10-03T08:10:37.066066+00:00",
+        "evaluation_timestamp": "2026-10-03T09:01:32.187487+00:00",
         "random_seed": 42,
         "library_versions": {
           "sklearn": "1.9.0",

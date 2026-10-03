@@ -110,7 +110,7 @@
     }
   },
   "metadata": {
-    "evaluation_timestamp": "2026-10-03T08:10:27.981042+00:00",
+    "evaluation_timestamp": "2026-10-03T09:01:11.150629+00:00",
     "random_seed": 42,
     "library_versions": {
       "sklearn": "1.9.0",

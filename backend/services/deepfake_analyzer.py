@@ -355,7 +355,7 @@ def analyze_deepfake(
             np.clip((ela_inconsistency - 0.55) / 0.6 * 80 + 10, 5, 95)
         )
         metadata_score = 10
-        if not has_exif and not any(file_name_lower.endswith(ext) for ext in [".webp", ".png"]):
+        if not has_exif:
             metadata_score = 45
             feedback.append(
                 "Missing EXIF Metadata: File lacks standard camera capture tags (model, aperture, GPS) typical of genuine device photos."

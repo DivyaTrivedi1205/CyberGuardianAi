@@ -71,47 +71,45 @@ def get_cnn_model() -> DeepfakeCNN:
     if _cnn_model is not None:
         return _cnn_model
 
-    model = DeepfakeCNN()
+    from services.deepfake_model import EfficientDeepfakeNet, LegacyDeepfakeCNN
+    
+    pretrained_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_pretrained.pth"))
+    
+    # PRIORITY 2 Path: legitimate transfer-learned backbone available?
+    if os.path.exists(pretrained_path):
+        try:
+            model = EfficientDeepfakeNet(num_classes=2, freeze_backbone=False) # Architecture
+            state_dict = torch.load(pretrained_path, map_location=torch.device("cpu"), weights_only=True)
+            model.load_state_dict(state_dict)
+            model.eval()
+            _cnn_model = model
+            print("[Priority 2] Successfully loaded EfficientNet-B0 Deepfake model.")
+            return _cnn_model
+        except Exception as e:
+            print(f"Warning: Failed to load Priority 2 pretrained model: {e}. Falling back.")
+
+    # PRIORITY 1 / Fallback Path
+    model = LegacyDeepfakeCNN()
 
     if not os.path.exists(CNN_MODEL_PATH):
         print("deepfake_cnn.pth not found. Auto-training default CNN model...")
         try:
+            from services.deepfake_model import train_deepfake_model
             train_deepfake_model()
         except Exception as e:
             print(f"Auto-training failed: {e}")
 
     if os.path.exists(CNN_MODEL_PATH):
-        # Verify integrity if hash is configured
         _verify_model_hash(CNN_MODEL_PATH, CNN_MODEL_EXPECTED_HASH)
-
         try:
-            # PyTorch 2.0+ supports weights_only=True for safer loading
-            # Weights-only loading prevents arbitrary code execution via pickle
-            state_dict = torch.load(
-                CNN_MODEL_PATH,
-                map_location=torch.device("cpu"),
-                weights_only=True  # Only load tensors, not arbitrary pickled objects
-            )
+            state_dict = torch.load(CNN_MODEL_PATH, map_location=torch.device("cpu"), weights_only=True)
             model.load_state_dict(state_dict)
             model.eval()
             _cnn_model = model
-            print("Successfully loaded Deepfake PyTorch CNN model with weights-only security.")
-        except TypeError:
-            # Fallback for older PyTorch versions without weights_only
-            print("WARNING: PyTorch version does not support weights_only=True. Falling back to standard load (hash verified).")
-            try:
-                model.load_state_dict(
-                    torch.load(CNN_MODEL_PATH, map_location=torch.device("cpu"))
-                )
-                model.eval()
-                _cnn_model = model
-                print("Loaded Deepfake model with standard torch.load (hash verified).")
-            except Exception as e:
-                print(f"Error loading deepfake model weights: {e}")
-                _cnn_model = model  # Use untrained model as fallback
+            print("Successfully loaded Legacy Deepfake PyTorch CNN model with weights-only security.")
         except Exception as e:
-            print(f"Error loading deepfake model weights: {e}")
-            _cnn_model = model  # Use untrained model as fallback
+            print(f"Error loading legacy deepfake model weights: {e}")
+            _cnn_model = model
     else:
         _cnn_model = model
 
@@ -377,9 +375,11 @@ def analyze_deepfake(
 
         cnn = get_cnn_model()
 
+        from services.deepfake_model import EfficientDeepfakeNet
+        target_size = (224, 224) if isinstance(cnn, EfficientDeepfakeNet) else (128, 128)
         transform = transforms.Compose(
             [
-                transforms.Resize((128, 128)),
+                transforms.Resize(target_size),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]

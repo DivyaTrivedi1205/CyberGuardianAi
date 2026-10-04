@@ -9,7 +9,36 @@ import torch
 import torch.nn as nn
 
 
-class DeepfakeCNN(nn.Module):
+
+import torchvision.models as models
+from torchvision.models import EfficientNet_B0_Weights
+
+class EfficientDeepfakeNet(nn.Module):
+    """
+    Priority 2: Legitimate Pretrained Computer Vision Backbone (EfficientNet-B0).
+    Suitable for transfer learning on real deepfake datasets.
+    Optimized for 6GB VRAM GPUs (RTX 4050).
+    """
+    def __init__(self, num_classes: int = 2, freeze_backbone: bool = True):
+        super().__init__()
+        weights = EfficientNet_B0_Weights.IMAGENET1K_V1
+        self.backbone = models.efficientnet_b0(weights=weights)
+        if freeze_backbone:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+        num_features = self.backbone.classifier[1].in_features
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(p=0.5, inplace=True),
+            nn.Linear(num_features, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.3, inplace=True),
+            nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.backbone(x)
+
+class LegacyDeepfakeCNN(nn.Module):
     """
     CNN architecture matching the trained deepfake_cnn.pth weights.
     Architecture:
@@ -287,3 +316,114 @@ def train_deepfake_model(dataset_path=None) -> str:
         
     print(f"Model saved to {model_path}")
     return model_path
+
+DeepfakeCNN = LegacyDeepfakeCNN
+
+
+def train_pretrained_deepfake_model(
+    dataset_dir: str,
+    epochs: int = 5,
+    batch_size: int = 32,
+    lr: float = 1e-3
+) -> str:
+    """
+    Priority 2 Training Pathway: Transfer learning using EfficientNet-B0 on a real dataset.
+    This guarantees NO SYNTHETIC fallback. If the directory is missing, it will abort.
+    """
+    import time
+    from services.deepfake_dataset import get_deepfake_dataloaders
+    
+    if not dataset_dir or not os.path.exists(dataset_dir):
+        raise FileNotFoundError(f"Real dataset directory missing at {dataset_dir}. Aborting transfer learning.")
+        
+    print(f"Initializing Transfer Learning on EfficientNet-B0...")
+    print(f"Dataset Directory: {dataset_dir}")
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # 1. Load data via Priority 1 DataLoader
+    train_dl, val_dl, test_dl, stats = get_deepfake_dataloaders(
+        dataset_dir=dataset_dir,
+        batch_size=batch_size,
+        seed=42
+    )
+    
+    if train_dl is None or stats.get('train_samples', 0) == 0:
+        raise ValueError(f"No valid training samples found in {dataset_dir}. Aborting.")
+        
+    print(f"Training samples: {stats['train_samples']} | Validation: {stats['val_samples']}")
+    
+    total_real = stats.get('real_count', 1)
+    total_fake = stats.get('fake_count', 1)
+    total = total_real + total_fake
+    if total_real > 0 and total_fake > 0:
+        weight_real = total / (2.0 * total_real)
+        weight_fake = total / (2.0 * total_fake)
+        class_weights = torch.tensor([weight_real, weight_fake], dtype=torch.float).to(device)
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = nn.CrossEntropyLoss()
+        
+    model = EfficientDeepfakeNet(num_classes=2, freeze_backbone=True)
+    model.to(device)
+    
+    optimizer = torch.optim.AdamW(model.backbone.classifier.parameters(), lr=lr)
+    best_val_loss = float('inf')
+    
+    models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models"))
+    os.makedirs(models_dir, exist_ok=True)
+    best_model_path = os.path.join(models_dir, "deepfake_pretrained.pth")
+    
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        correct, total_s = 0, 0
+        
+        start_time = time.time()
+        for inputs, labels in train_dl:
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs, 1)
+            total_s += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            
+        train_acc = 100.0 * correct / total_s
+        train_loss = running_loss / total_s
+        
+        model.eval()
+        val_loss = 0.0
+        val_correct, val_total = 0, 0
+        
+        with torch.no_grad():
+            for val_inputs, val_labels in val_dl:
+                val_inputs, val_labels = val_inputs.to(device), val_labels.to(device)
+                val_outputs = model(val_inputs)
+                v_loss = criterion(val_outputs, val_labels)
+                val_loss += v_loss.item() * val_inputs.size(0)
+                _, val_pred = torch.max(val_outputs, 1)
+                val_total += val_labels.size(0)
+                val_correct += (val_pred == val_labels).sum().item()
+                
+        val_acc = 100.0 * val_correct / val_total
+        val_loss = val_loss / val_total
+        epoch_time = time.time() - start_time
+        
+        print(f"Epoch {epoch+1}/{epochs} [{epoch_time:.1f}s] - Train Loss: {train_loss:.4f} Acc: {train_acc:.2f}% | Val Loss: {val_loss:.4f} Acc: {val_acc:.2f}%")
+        
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            try:
+                torch.save(model.state_dict(), best_model_path)
+            except Exception:
+                pass
+            print(f"  ---> Saved new best model to {best_model_path}")
+            
+    print("Transfer Learning Complete.")
+    return best_model_path

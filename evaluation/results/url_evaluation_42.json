@@ -127,22 +127,22 @@
     "test_samples": 2211,
     "train_samples": 8844,
     "library_versions": {
-      "sklearn": "1.9.0",
+      "sklearn": "1.9.1",
       "xgboost": "3.4.1",
-      "torch": "2.13.0+cpu",
-      "pandas": "3.0.5",
-      "numpy": "2.5.2"
+      "torch": "2.14.0+cpu",
+      "pandas": "3.0.6",
+      "numpy": "2.4.3"
     }
   },
   "metadata": {
-    "evaluation_timestamp": "2026-10-03T09:01:11.049071+00:00",
+    "evaluation_timestamp": "2026-10-04T09:23:48.712073+00:00",
     "random_seed": 42,
     "library_versions": {
-      "sklearn": "1.9.0",
+      "sklearn": "1.9.1",
       "xgboost": "3.4.1",
-      "torch": "2.13.0+cpu",
-      "pandas": "3.0.5",
-      "numpy": "2.5.2"
+      "torch": "2.14.0+cpu",
+      "pandas": "3.0.6",
+      "numpy": "2.4.3"
     },
     "hostname": "DIVYATRIVEDI12"
   }

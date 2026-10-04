@@ -88,6 +88,7 @@ class Settings:
     MAX_URL_FETCH_TIMEOUT: float = float(get_env("MAX_URL_FETCH_TIMEOUT", "10.0"))
     MAX_URL_REDIRECTS: int = get_env_int("MAX_URL_REDIRECTS", 5)
     MAX_RESPONSE_SIZE: int = get_env_int("MAX_RESPONSE_SIZE", 10)  # MB
+    DEEPFAKE_DATASET_DIR: str = os.getenv("DEEPFAKE_DATASET_DIR", "")  # Path to real deepfake dataset
 
     @classmethod
     def initialize_from_env(cls) -> None:

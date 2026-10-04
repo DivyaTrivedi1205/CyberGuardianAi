@@ -248,7 +248,7 @@ def get_forensics_classifier() -> RandomForestClassifier:
     return None
 
 
-def evaluate_deepfake_cnn(
+def evaluate_deepfake_cnn_synthetic(
     output_path: str = None,
     num_samples: int = 400,
     random_state: int = 42
@@ -411,32 +411,18 @@ def evaluate_deepfake_cnn(
 
     return results
 
-
-def evaluate_deepfake_model(
-    output_path: str = None,
-    method: str = 'cnn',
-    **kwargs
-) -> Dict[str, Any]:
-    """
-    Evaluate the deepfake detection model.
-
-    Args:
-        output_path: Path to save results JSON
-        method: Evaluation method ('cnn' or 'forensics')
-        **kwargs: Additional arguments passed to the evaluator
-
-    Returns:
-        Dictionary containing evaluation results
-    """
+def evaluate_deepfake_model(output_path=None, method="cnn", **kwargs):
+    from config import settings
     if method == 'cnn':
-        return evaluate_deepfake_cnn(output_path, **kwargs)
+        if settings.DEEPFAKE_DATASET_DIR and os.path.exists(settings.DEEPFAKE_DATASET_DIR):
+            print("--- REAL DATASET CONFIGURED ---")
+            model = load_cnn_model()
+            return evaluate_deepfake_real(model, settings.DEEPFAKE_DATASET_DIR, output_path, **kwargs)
+        else:
+            print("--- WARNING: NO REAL DATASET CONFIGURED ---")
+            print("Falling back to SYNTHETIC test fixture. Metrics shown below do NOT represent real-world performance.")
+            return evaluate_deepfake_cnn_synthetic(output_path, **kwargs)
     elif method == 'forensics':
         raise NotImplementedError("Forensics Random Forest evaluation not yet implemented")
     else:
         raise ValueError(f"Unknown method: {method}")
-
-
-if __name__ == '__main__':
-    # Run evaluation
-    results = evaluate_deepfake_model()
-    print(f"\nDeepfake evaluation completed. Results saved to: {results}")

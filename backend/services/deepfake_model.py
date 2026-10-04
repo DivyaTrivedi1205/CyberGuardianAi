@@ -206,6 +206,11 @@ def extract_forensics_features(img: Image.Image) -> np.ndarray:
     return np.array(features, dtype=np.float32)
 
 def train_deepfake_model(dataset_path=None) -> str:
+    from config import settings
+    # Override dataset path seamlessly from settings if available and not explicitly provided
+    if dataset_path is None and settings.DEEPFAKE_DATASET_DIR:
+        dataset_path = settings.DEEPFAKE_DATASET_DIR
+
     print("Initializing Deepfake Random Forest training...")
     
     X = []
@@ -242,8 +247,13 @@ def train_deepfake_model(dataset_path=None) -> str:
                     except Exception:
                         pass
                         
-    # If no custom data was loaded, train on generated synthetic patterns
+    # If no custom data was loaded, train on generated synthetic patterns (WARNING)
     if not loaded_custom:
+        print("\n=======================================================")
+        print("WARNING: NO REAL DATASET PROVIDED FOR TRAINING.")
+        print("Proceeding with SYNTHETIC mathematical noise overlays.")
+        print("This is a test fixture ONLY and NOT for production.")
+        print("=======================================================\n")
         print("Generating synthetic dataset of forensics patterns...")
         for i in range(400):
             is_fake = (i % 2 == 1)

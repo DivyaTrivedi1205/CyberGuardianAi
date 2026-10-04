@@ -462,3 +462,4 @@ def analyze_deepfake(
         "file_type": file_type,
         "metadata": meta_info,
     }
+

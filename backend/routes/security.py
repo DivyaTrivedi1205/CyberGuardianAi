@@ -31,7 +31,7 @@ from routes.auth import (
     get_user_by_id,
     build_user_out,
 )
-from config import JWT_SECRET, JWT_ALGORITHM
+from config import JWT_SECRET, JWT_ALGORITHM, settings
 from services.password_service import (
     score_password,
     save_password_scan,
@@ -538,11 +538,21 @@ async def analyze_deepfake_endpoint(
             detail="Invalid filename — contains disallowed characters.",
         )
 
-    # Run analysis
     try:
-        analysis = analyze_deepfake(content, safe_filename, content_type)
+        from services.video_deepfake_analyzer import analyze_deepfake_video
+
+        # Route to specialized video analyzer if applicable
+        is_video = "video" in content_type.lower() or any(
+            safe_filename.lower().endswith(ext)
+            for ext in [".mp4", ".mov", ".avi", ".webm", ".mkv"]
+        )
+
+        if is_video:
+            analysis = analyze_deepfake_video(content, safe_filename, content_type)
+        else:
+            analysis = analyze_deepfake(content, safe_filename, content_type)
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Deepfake analysis failed.")
+        raise HTTPException(status_code=500, detail=f"Deepfake analysis failed: {str(e)}")
 
     # Save scan history if authenticated
     if current_user:
@@ -580,6 +590,8 @@ async def analyze_deepfake_endpoint(
         feedback=analysis["feedback"],
         features=analysis["features"],
         metadata=analysis["metadata"],
+        evidence=analysis.get("evidence"),
+        suspicious_frames=analysis.get("suspicious_frames"),
     )
 
 

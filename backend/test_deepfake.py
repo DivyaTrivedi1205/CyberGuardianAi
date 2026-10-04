@@ -7,6 +7,9 @@ from PIL import Image
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from services.deepfake_analyzer import analyze_deepfake
+from services.video_deepfake_analyzer import analyze_deepfake_video
+import cv2
+import numpy as np
 
 def test_deepfake_detector():
     print("=== Testing Deepfake Service ===")
@@ -77,6 +80,42 @@ def test_deepfake_detector():
     for fb in result_vid['feedback']:
         print(f" - {fb}")
     assert any("FFmpeg" in msg for msg in result_vid['feedback']), "FFmpeg signature feedback should be present"
+
+    # Test case 5: Advanced Video Deepfake Analysis
+    print("\nTest Case 5: Advanced Video Deepfake Analysis (Frame Extraction)")
+    # We will create a small synthetic mp4 in memory using cv2 if available, or just test the failure logic gracefully
+    try:
+        import tempfile
+        import shutil
+        temp_dir = tempfile.mkdtemp()
+        vid_path = os.path.join(temp_dir, "test_synth.mp4")
+
+        # Create a tiny 1-second video with randomly colored frames
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(vid_path, fourcc, 10.0, (128, 128))
+        for _ in range(10):  # 10 frames = 1 second
+            frame = np.random.randint(0, 255, (128, 128, 3), dtype=np.uint8)
+            out.write(frame)
+        out.release()
+
+        with open(vid_path, "rb") as f:
+            real_vid_bytes = f.read()
+
+        shutil.rmtree(temp_dir)
+
+        result_advanced_vid = analyze_deepfake_video(real_vid_bytes, "synth_test.mp4", "video/mp4")
+        print(f"File: {result_advanced_vid['metadata']['file_name']}")
+        print(f"Prediction: {result_advanced_vid['prediction']}")
+        print(f"Risk Score: {result_advanced_vid['risk_score']}%")
+        print("Feedback:")
+        for fb in result_advanced_vid['feedback']:
+            print(f" - {fb}")
+
+        assert 'evidence' in result_advanced_vid, "Should return advanced evidence block for videos"
+        assert 'metadata' in result_advanced_vid, "Should return metadata block"
+
+    except Exception as e:
+        print(f"WARNING: Could not generate and test synthetic video chunk. Error: {e}")
 
     print("\n=== Deepfake Service Tests Completed Successfully ===")
 

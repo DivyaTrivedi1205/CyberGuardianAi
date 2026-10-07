@@ -99,7 +99,12 @@ class DeepfakeDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        filepath, label, video_id = self.samples[idx]
+        sample = self.samples[idx]
+        if len(sample) > 3:
+            filepath, label, video_id, frame_fraction = sample
+        else:
+            filepath, label, video_id = sample
+            frame_fraction = None
 
         is_video = filepath.lower().endswith(('.mp4', '.avi', '.mov', '.webm', '.mkv'))
 
@@ -117,10 +122,12 @@ class DeepfakeDataset(Dataset):
                 if cap.isOpened():
                     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                     if total_frames > 0:
-                        import random
-                        # Pick a random frame to extract
-                        random_frame_idx = random.randint(0, max(0, total_frames - 1))
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame_idx)
+                        if frame_fraction is not None:
+                            target_frame_idx = int(frame_fraction * (total_frames - 1))
+                        else:
+                            import random
+                            target_frame_idx = random.randint(0, max(0, total_frames - 1))
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame_idx)
                         ret, frame = cap.read()
                         if ret and frame is not None:
                             # Convert BGR to RGB

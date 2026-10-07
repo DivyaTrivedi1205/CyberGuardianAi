@@ -18,7 +18,7 @@ def run_tests():
     blank_frame = np.zeros((480, 640, 3), dtype=np.uint8)
     faces = extractor.extract_faces(blank_frame)
     assert len(faces) == 0, "Blank frame should yield 0 faces"
-    print("✓ no-face frame handled correctly")
+    print("[PASS] no-face frame handled correctly")
 
     # 2. Corrupted frames
     faces = extractor.extract_faces(None)
@@ -26,7 +26,7 @@ def run_tests():
 
     faces = extractor.extract_faces(np.empty((0, 0, 3)))
     assert len(faces) == 0, "Empty geometry frame should yield 0 faces safely"
-    print("✓ corrupted frames handled safely")
+    print("[PASS] corrupted frames handled safely")
 
     # To test actual detection, multiple faces, and dimensions,
     # let's write a quick mock of cv2.dnn.Net to return fake detections
@@ -65,15 +65,15 @@ def run_tests():
     faces = extractor.extract_faces(test_frame, max_faces=1)
     assert len(faces) == 1, "Should only return 1 face"
     assert faces[0].shape == (224, 224, 3), "Crop should be resized to correct output dimensions (224x224)"
-    print("✓ multiple-face logic handles sorting correctly")
+    print("[PASS] multiple-face logic handles sorting correctly")
 
     # Extract max 2 faces
     faces_multi = extractor.extract_faces(test_frame, max_faces=2)
     assert len(faces_multi) == 2, "Should return 2 high-confidence faces"
     assert faces_multi[0].shape == (224, 224, 3)
     assert faces_multi[1].shape == (224, 224, 3)
-    print("✓ preprocess output dimensions correct (224x224)")
-    print("✓ API compatibility verified")
+    print("[PASS] preprocess output dimensions correct (224x224)")
+    print("[PASS] API compatibility verified")
 
     # Restore model
     extractor.net = old_net

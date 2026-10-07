@@ -28,10 +28,10 @@ class EfficientDeepfakeNet(nn.Module):
                 param.requires_grad = False
         num_features = self.backbone.classifier[1].in_features
         self.backbone.classifier = nn.Sequential(
-            nn.Dropout(p=0.5, inplace=True),
+            nn.Dropout(p=0.5, inplace=False),
             nn.Linear(num_features, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.3, inplace=True),
+            nn.ReLU(inplace=False),
+            nn.Dropout(p=0.3, inplace=False),
             nn.Linear(256, num_classes)
         )
 

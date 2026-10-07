@@ -101,12 +101,50 @@ class DeepfakeDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         filepath, label, video_id = self.samples[idx]
 
-        try:
-            img = Image.open(filepath).convert("RGB")
-        except Exception:
-            # Fallback to an empty array to prevent crashing mid-training
-            # Validation should catch these before this point.
-            img = Image.new("RGB", self.target_size, (0, 0, 0))
+        is_video = filepath.lower().endswith(('.mp4', '.avi', '.mov', '.webm', '.mkv'))
+
+        img = None
+        if not is_video:
+            try:
+                img = Image.open(filepath).convert("RGB")
+            except Exception:
+                img = Image.new("RGB", self.target_size, (0, 0, 0))
+        else:
+            # On-the-fly frame sampling for videos
+            try:
+                import cv2
+                cap = cv2.VideoCapture(filepath)
+                if cap.isOpened():
+                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                    if total_frames > 0:
+                        import random
+                        # Pick a random frame to extract
+                        random_frame_idx = random.randint(0, max(0, total_frames - 1))
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame_idx)
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            # Convert BGR to RGB
+                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                            # Use FaceExtractor if possible
+                            try:
+                                from .face_extractor import OpenCVDNNFaceExtractor
+                                extractor = OpenCVDNNFaceExtractor(target_size=self.target_size)
+                                faces = extractor.extract_faces(frame_rgb, max_faces=1)
+                                if faces:
+                                    img = Image.fromarray(faces[0])
+                                else:
+                                    # Fallback to full frame resize if no face detected
+                                    img = Image.fromarray(cv2.resize(frame_rgb, self.target_size))
+                            except Exception:
+                                # Fallback to simply resizing the frame if extraction fails
+                                img = Image.fromarray(cv2.resize(frame_rgb, self.target_size))
+                cap.release()
+            except Exception:
+                pass
+
+            if img is None:
+                img = Image.new("RGB", self.target_size, (0, 0, 0))
 
         if self.transform:
             img_tensor = self.transform(img)

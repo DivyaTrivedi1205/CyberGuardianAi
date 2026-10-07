@@ -73,7 +73,7 @@ def _get_haar_cascade_path() -> str:
 
 def _detect_faces_cv2(img: np.ndarray) -> List[Dict[str, Any]]:
     """
-    Detect faces using OpenCV Haar Cascade.
+    Detect faces using OpenCV DNN Face Extractor (Modern) with fallback to Haar Cascade.
 
     Args:
         img: RGB image as numpy array
@@ -81,6 +81,44 @@ def _detect_faces_cv2(img: np.ndarray) -> List[Dict[str, Any]]:
     Returns:
         List of face dictionaries with bounding box and confidence
     """
+    try:
+        from .face_extractor import OpenCVDNNFaceExtractor
+        extractor = OpenCVDNNFaceExtractor()
+
+        # The DNN model requires BGR/RGB input
+        h, w = img.shape[:2]
+        blob = cv2.dnn.blobFromImage(
+            img, 1.0, (300, 300),
+            (104.0, 117.0, 123.0),
+            swapRB=True, crop=False
+        )
+        extractor.net.setInput(blob)
+        detections = extractor.net.forward()
+
+        face_regions = []
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > extractor.confidence_threshold:
+                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                (startX, startY, endX, endY) = box.astype("int")
+                box_w = endX - startX
+                box_h = endY - startY
+                if box_w > 10 and box_h > 10:
+                    face_regions.append({
+                        'x': int(startX),
+                        'y': int(startY),
+                        'width': int(box_w),
+                        'height': int(box_h),
+                        'confidence': float(confidence),
+                        'area': int(box_w * box_h)
+                    })
+
+        if face_regions:
+            return face_regions
+    except Exception:
+        pass
+
+    # Fallback to Haar Cascade
     try:
         cascade_path = _get_haar_cascade_path()
         if not os.path.exists(cascade_path):

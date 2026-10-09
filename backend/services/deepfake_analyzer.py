@@ -73,13 +73,15 @@ def get_cnn_model() -> DeepfakeCNN:
 
     from services.deepfake_model import EfficientDeepfakeNet, LegacyDeepfakeCNN
     
-    pretrained_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_pretrained.pth"))
+    pretrained_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_large_experiment_best.pth"))
     
     # PRIORITY 2 Path: legitimate transfer-learned backbone available?
     if os.path.exists(pretrained_path):
         try:
             model = EfficientDeepfakeNet(num_classes=2, freeze_backbone=False) # Architecture
             state_dict = torch.load(pretrained_path, map_location=torch.device("cpu"), weights_only=True)
+            if "model_state_dict" in state_dict:
+                state_dict = state_dict["model_state_dict"]
             model.load_state_dict(state_dict)
             model.eval()
             _cnn_model = model

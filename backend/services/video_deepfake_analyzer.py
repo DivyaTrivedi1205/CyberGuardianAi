@@ -392,26 +392,13 @@ def _analyze_image_for_video(
 
     # Load CNN model
     try:
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from services.deepfake_model import DeepfakeCNN
+        from services.deepfake_analyzer import get_cnn_model
+        from services.deepfake_model import EfficientDeepfakeNet
+        model = get_cnn_model()
 
-        model = DeepfakeCNN()
-        cnn_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_cnn.pth")
-        )
-
-        if os.path.exists(cnn_path):
-            try:
-                state_dict = torch.load(cnn_path, map_location=torch.device('cpu'), weights_only=True)
-                model.load_state_dict(state_dict)
-                model.eval()
-            except Exception:
-                model.load_state_dict(torch.load(cnn_path, map_location=torch.device('cpu')))
-                model.eval()
-
+        target_size = (224, 224) if isinstance(model, EfficientDeepfakeNet) else (128, 128)
         transform = transforms.Compose([
-            transforms.Resize((128, 128)),
+            transforms.Resize(target_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
@@ -1145,26 +1132,13 @@ def analyze_deepfake_image_original(
     features["Metadata Anomalies"] = metadata_score
 
     try:
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from services.deepfake_model import DeepfakeCNN
+        from services.deepfake_analyzer import get_cnn_model
+        from services.deepfake_model import EfficientDeepfakeNet
+        model = get_cnn_model()
 
-        model = DeepfakeCNN()
-        cnn_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "models", "deepfake_cnn.pth")
-        )
-
-        if os.path.exists(cnn_path):
-            try:
-                state_dict = torch.load(cnn_path, map_location=torch.device('cpu'), weights_only=True)
-                model.load_state_dict(state_dict)
-                model.eval()
-            except Exception:
-                model.load_state_dict(torch.load(cnn_path, map_location=torch.device('cpu')))
-                model.eval()
-
+        target_size = (224, 224) if isinstance(model, EfficientDeepfakeNet) else (128, 128)
         transform = transforms.Compose([
-            transforms.Resize((128, 128)),
+            transforms.Resize(target_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])

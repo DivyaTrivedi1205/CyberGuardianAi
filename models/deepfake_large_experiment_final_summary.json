@@ -1,0 +1,35 @@
+{
+    "experiment": "Large Experiment FaceForensics++ C23",
+    "dataset": {
+        "source": "FaceForensics++",
+        "total_videos": 6000,
+        "split_method": "Graph-based isolated pair component splitting (no video ID leakage)",
+        "train_videos": 4200,
+        "val_videos": 900,
+        "test_videos": 900
+    },
+    "preprocessing": {
+        "method": "OpenCV DNN Face Extractor",
+        "target_size": [224, 224],
+        "frames_per_video": 5,
+        "fractions": [0.1, 0.3, 0.5, 0.7, 0.9],
+        "cache": "Pre-extracted JPEG frames to disk to prevent CPU bottleneck"
+    },
+    "model": {
+        "architecture": "EfficientNet-B0 (pretrained on ImageNet)",
+        "fine_tuning": "Partial (features lr=1e-4, classifier lr=1e-3)",
+        "training_technique": "WeightedRandomSampler for class balance"
+    },
+    "results_best_val_epoch_2": {
+        "vid_acc": 0.9367,
+        "vid_f1": 0.9397,
+        "vid_auc": 0.9798
+    },
+    "results_final_test": {
+        "vid_acc": 0.9433,
+        "vid_f1": 0.9464,
+        "vid_auc": 0.9832,
+        "cm": {"tn": 133, "fp": 17, "fn": 0, "tp": 150}
+    },
+    "conclusion": "The cached large experiment proved successful. A significant CPU decoding bottleneck was resolved by caching OpenCV DNN face crops into JPEGs (~12.5K images/hour prep rate). Training 4,200 videos (21,000 frames) completed rapidly per epoch (~4.5 minutes), reaching optimal validation state at Epoch 2. Tested effectively with an AUC of 0.9832."
+}

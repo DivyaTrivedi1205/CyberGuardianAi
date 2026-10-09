@@ -1,0 +1,42 @@
+{
+    "general_configuration": {
+        "dataset_split": "100 train / 20 val videos per class (Total: 200 train, 40 val videos)",
+        "frame_sampling_strategy": "5 frames per video at uniform fractions [0.1, 0.3, 0.5, 0.7, 0.9]",
+        "video_level_aggregation_method": "Average frame probability (soft voting) thresholded at 0.5"
+    },
+    "pilot2_baseline": {
+        "configuration": "EfficientNet-B0 backbone (frozen) + custom classifier head. lr=0.001",
+        "trainable_parameters": 328450,
+        "total_parameters": 4335998,
+        "checkpoint_path": "models/deepfake_pilot_baseline.pth",
+        "total_training_time_seconds": 1351.8967113494873,
+        "best_epoch": 4,
+        "best_metrics": {
+            "video_accuracy": 0.725,
+            "video_precision": 0.8,
+            "video_recall": 0.6,
+            "video_f1": 0.6857,
+            "video_roc_auc": 0.8125
+        }
+    },
+    "pilot3_best_model": {
+        "configuration": "EfficientNet-B0 backbone (unfrozen, fine-tuned). Includes data augmentation (RandomHorizontalFlip, ColorJitter).",
+        "trainable_parameters": 4335998,
+        "total_parameters": 4335998,
+        "checkpoint_path": "models/deepfake_pilot3_resumed.pth",
+        "total_training_time_seconds": 3815.1101751327515,
+        "best_epoch": 3,
+        "best_metrics": {
+            "video_accuracy": 0.775,
+            "video_precision": 0.8235294117647058,
+            "video_recall": 0.7,
+            "video_f1": 0.7567567567567568,
+            "video_roc_auc": 0.8275,
+            "confusion_matrix": "TP=14, TN=17, FP=3, FN=6"
+        }
+    },
+    "comparison": {
+        "video_accuracy_improvement": 0.050000000000000044,
+        "video_f1_improvement": 0.07104247104247108
+    }
+}

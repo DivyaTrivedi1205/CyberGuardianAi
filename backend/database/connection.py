@@ -139,8 +139,7 @@ def initialize_database() -> None:
                 ON message_scans(user_id, created_at DESC)
                 """
             )
-
-            # Create community_reports table for Phase 5 Community Intelligence
+# Create community_reports table for Phase 5 Community Intelligence
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS community_reports (
@@ -163,6 +162,27 @@ def initialize_database() -> None:
                 ON community_reports(indicator_value)
                 """
             )
+
+            # Create community_report_votes to prevent duplicate votes
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS community_report_votes (
+                    id BIGSERIAL PRIMARY KEY,
+                    report_id BIGINT NOT NULL REFERENCES community_reports(id) ON DELETE CASCADE,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    vote_type TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    UNIQUE(report_id, user_id)
+                )
+                """
+            )
+            
+            # Add reputation_score to users if it doesn't exist
+            cursor.execute("SAVEPOINT rep_score")
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN reputation_score INTEGER DEFAULT 100")
+            except Exception:
+                cursor.execute("ROLLBACK TO SAVEPOINT rep_score")
 
             # Create deepfake_scans table
             cursor.execute(

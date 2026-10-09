@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     identifier: str
     identifier_type: Literal["email", "phone"]
     auth_provider: str
+    reputation_score: int = 100
 
 class AuthResponse(BaseModel):
     access_token: str

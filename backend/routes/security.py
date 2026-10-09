@@ -47,6 +47,7 @@ from services.scam_psychology import analyze_scam_psychology
 from services.community_reputation import check_community_reputation
 
 from services.deepfake_analyzer import analyze_deepfake
+from services.risk_fusion import compute_unified_risk
 
 router = APIRouter(prefix="/security", tags=["security"])
 
@@ -139,7 +140,7 @@ def get_optional_user(
 # --- Password analysis ---
 
 @router.post("/analyze-password", response_model=PasswordAnalysisResponse)
-def analyze_password(
+def analyze_password_endpoint(
     payload: PasswordAnalysisRequest,
     current_user: Optional[UserOut] = Depends(get_optional_user),
 ) -> PasswordAnalysisResponse:
@@ -178,7 +179,14 @@ def analyze_password(
         patterns_detected=formatted['patterns_detected'],
         common_password=formatted['common_password'],
         entropy_estimate=formatted['entropy_estimate'],
-        crack_time_estimate=formatted.get('crack_time_estimate')
+        crack_time_estimate=formatted.get('crack_time_estimate'),
+        unified_assessment=compute_unified_risk(
+            model_score=None,
+            reputation_status=None,
+            heuristic_score=int(100 - formatted['score']), # lower score = higher risk
+            domain="password",
+            explanations=formatted['findings']
+        ).dict()
     )
 
 
@@ -250,13 +258,15 @@ def analyze_url(
                             connection.rollback()
 
                 scam_analysis = analyze_scam_psychology(url)
+                unified = compute_unified_risk(model_score=None, reputation_status="verified_threat", heuristic_score=risk_score, domain="url", explanations=explanations)
                 return UrlAnalysisResponse(
                     url=url,
-                    risk_score=risk_score,
-                    prediction=prediction,
+                    risk_score=unified.overall_risk_score,
+                    prediction=unified.overall_risk_category,
                     features=features,
                     feedback=explanations,
                     scam_psychology=scam_analysis,
+                    unified_assessment=unified.dict()
                 )
             elif reputation["status"] == "pending":
                 pending_warning = f"CrowdShield Alert: This URL has been reported by community users and is pending verification (Reports: {reputation['reports_count']})."
@@ -326,15 +336,33 @@ def analyze_url(
                 )
 
     # 4. Analyze scam psychology triggers on the URL itself
+
+    # Calculate heuristic score from explanations and features
+    negative_features = sum(1 for v in features.values() if v == -1) if 'features' in locals() and features else len([e for e in explanations if "pending verification" not in e])
+    heuristic_score = min(100, negative_features * 15)
+    
     scam_analysis = analyze_scam_psychology(url)
+
+    unified = compute_unified_risk(
+        model_score=risk_score if 'prob' in locals() else None, 
+        reputation_status=reputation["status"] if 'reputation' in locals() and reputation else None, 
+        heuristic_score=heuristic_score, 
+        domain="url", 
+        explanations=explanations
+    )
+
+    # Use unified score for the final response
+    final_score = unified.overall_risk_score
+    prediction = unified.overall_risk_category
 
     return UrlAnalysisResponse(
         url=url,
-        risk_score=risk_score,
+        risk_score=final_score,
         prediction=prediction,
         features=features,
         feedback=explanations,
         scam_psychology=scam_analysis,
+        unified_assessment=unified.dict()
     )
 
 
@@ -409,12 +437,14 @@ def analyze_message(
                             connection.rollback()
 
                 scam_analysis = analyze_scam_psychology(message)
+                unified = compute_unified_risk(model_score=None, reputation_status="verified_threat", heuristic_score=risk_score, domain="message", explanations=feedback)
                 return MessageAnalysisResponse(
                     message=message,
-                    risk_score=risk_score,
-                    prediction=prediction,
+                    risk_score=unified.overall_risk_score,
+                    prediction=unified.overall_risk_category,
                     feedback=feedback,
                     scam_psychology=scam_analysis,
+                    unified_assessment=unified.dict()
                 )
             elif reputation["status"] == "pending":
                 pending_warning = f"CrowdShield Alert: This message has been reported by community users and is pending verification (Reports: {reputation['reports_count']})."
@@ -459,12 +489,23 @@ def analyze_message(
                     status_code=500, detail="Failed to save message scan history."
                 )
 
+    heuristic_score = min(100, len(analysis["feedback"]) * 15) if analysis.get("feedback") else None
+
+    unified = compute_unified_risk(
+        model_score=analysis["risk_score"],
+        reputation_status=reputation["status"] if 'reputation' in locals() and reputation else None,
+        heuristic_score=heuristic_score,
+        domain="message",
+        explanations=analysis.get("feedback", [])
+    )
+
     return MessageAnalysisResponse(
         message=message,
-        risk_score=analysis["risk_score"],
-        prediction=analysis["prediction"],
+        risk_score=unified.overall_risk_score,
+        prediction=unified.overall_risk_category,
         feedback=analysis["feedback"],
         scam_psychology=scam_analysis,
+        unified_assessment=unified.dict()
     )
 
 
@@ -592,6 +633,13 @@ async def analyze_deepfake_endpoint(
         metadata=analysis["metadata"],
         evidence=analysis.get("evidence"),
         suspicious_frames=analysis.get("suspicious_frames"),
+        unified_assessment=compute_unified_risk(
+            model_score=analysis["risk_score"],
+            reputation_status=None,
+            heuristic_score=None,
+            domain="file",
+            explanations=analysis.get("feedback", [])
+        ).dict()
     )
 
 

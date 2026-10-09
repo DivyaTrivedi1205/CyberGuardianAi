@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
+from services.risk_fusion import UnifiedAssessment
 
 # URL Analysis Schemas
 class UrlAnalysisRequest(BaseModel):
@@ -12,6 +13,7 @@ class UrlAnalysisResponse(BaseModel):
     features: Dict[str, int]
     feedback: List[str]
     scam_psychology: Optional[Dict[str, Any]] = None
+    unified_assessment: Optional[Any] = None
 
 class UrlScanHistoryItem(BaseModel):
     id: int
@@ -32,6 +34,7 @@ class MessageAnalysisResponse(BaseModel):
     prediction: str
     feedback: List[str]
     scam_psychology: Optional[Dict[str, Any]] = None
+    unified_assessment: Optional[Any] = None
 
 class MessageScanHistoryItem(BaseModel):
     id: int
@@ -71,6 +74,7 @@ class DeepfakeAnalysisResponse(BaseModel):
     metadata: Dict[str, Any]
     evidence: Optional[Dict[str, Any]] = None
     suspicious_frames: Optional[List[Dict[str, Any]]] = None
+    unified_assessment: Optional[Any] = None
 
 class DeepfakeScanHistoryItem(BaseModel):
     id: int
@@ -97,3 +101,4 @@ class PasswordAnalysisResponse(BaseModel):
     common_password: bool
     entropy_estimate: float
     crack_time_estimate: Optional[Dict[str, Any]] = None
+    unified_assessment: Optional[Any] = None

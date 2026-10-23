@@ -388,11 +388,12 @@ export default function App() {
       setDeepfakeResult({
         file_name: deepfakeFile.name,
         file_type: deepfakeFile.type.includes('video') ? 'video' : 'image',
-        prediction: 'Authentic',
-        risk_score: 12,
+        prediction: 'Analysis Failed',
+        risk_score: 0,
         features: {},
-        feedback: ['Error executing backend deepfake scan. Displaying local authentic status.'],
-        metadata: { file_size_bytes: deepfakeFile.size }
+        feedback: ['Backend unavailable. Analysis could not be completed. ' + (error.message || 'Check that the backend server is running.')],
+        metadata: { file_size_bytes: deepfakeFile.size },
+        error: true
       })
     } finally {
       setIsScanningDeepfake(false)
@@ -985,24 +986,39 @@ export default function App() {
 
           <article className="panel analyzer-result-card">
             <p className="eyebrow">Authenticity Verdict</p>
-            <h3>{deepfakeResult ? `${deepfakeResult.prediction}` : 'No scan run yet'}</h3>
+            <h3 style={{ color: deepfakeResult?.error ? '#f59e0b' : 'inherit' }}>
+              {deepfakeResult ? `${deepfakeResult.prediction}` : 'No scan run yet'}
+            </h3>
 
             {deepfakeResult ? (
               <>
                 <div className="score-row analyzer-score-row">
                   <div>
                     <p className="score-label">Deepfake Risk Probability</p>
-                    <strong className="score-value">{deepfakeResult.risk_score}%</strong>
+                    <strong className="score-value" style={{
+                      color: deepfakeResult.error ? '#94a3b8' :
+                             deepfakeResult.risk_score >= 60 ? '#ef4444' :
+                             deepfakeResult.risk_score >= 30 ? '#f59e0b' : '#22c55e'
+                    }}>
+                      {deepfakeResult.error ? 'N/A' : deepfakeResult.risk_score + '%'}
+                    </strong>
                   </div>
-                  <div className="score-meter">
-                    <span style={{ width: `${deepfakeResult.risk_score}%`, background: deepfakeResult.risk_score >= 60 ? '#ef4444' : deepfakeResult.risk_score >= 30 ? '#f59e0b' : '#22c55e' }} />
-                  </div>
+                  {!deepfakeResult.error && (
+                    <div className="score-meter">
+                      <span style={{ width: `${deepfakeResult.risk_score}%`, background: deepfakeResult.risk_score >= 60 ? '#ef4444' : deepfakeResult.risk_score >= 30 ? '#f59e0b' : '#22c55e' }} />
+                    </div>
+                  )}
                 </div>
 
-                <p className="score-label">Explainable Detection Signals:</p>
+                <p className="score-label">Analysis Result:</p>
                 <ul className="feedback-list">
                   {deepfakeResult.feedback.map((item, idx) => (
-                    <li key={idx} style={{ color: deepfakeResult.risk_score >= 30 ? '#fca5a5' : '#cbd5e1' }}>{item}</li>
+                    <li key={idx} style={{
+                      color: deepfakeResult.error ? '#fcd34d' :
+                             deepfakeResult.risk_score >= 30 ? '#fca5a5' : '#cbd5e1'
+                    }}>
+                      {deepfakeResult.error ? '⚠️ ' + item : item}
+                    </li>
                   ))}
                 </ul>
 

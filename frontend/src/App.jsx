@@ -66,7 +66,12 @@ export default function App() {
       const data = await apiRequest('/community/reports')
       setCommunityReports(data)
     } catch (error) {
-      console.error('Failed to fetch community reports:', error)
+      // 401 is expected when not authenticated; silently handle
+      if (error.message && error.message.includes('401')) {
+        console.debug('Community reports require authentication')
+      } else {
+        console.error('Failed to fetch community reports:', error)
+      }
     }
   }
 
@@ -244,7 +249,13 @@ export default function App() {
           display_name: authTab === 'signup' ? displayName.trim() : undefined,
         }),
       })
-      setAuthMessage(response.message)
+
+      // In development mode, show the OTP directly
+      if (response.otp_code) {
+        setAuthMessage(`DEV MODE: Your OTP is ${response.otp_code}`)
+      } else {
+        setAuthMessage(response.message)
+      }
       setOtpSent(true)
       return true
     } catch (error) {

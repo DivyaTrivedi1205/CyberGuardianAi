@@ -223,6 +223,11 @@ def verify_otp_challenge(
     return challenge
 
 
+def is_development_mode() -> bool:
+    """Check if running in development mode (development OTP mode enabled)."""
+    return settings.DEV_OTP_MODE
+
+
 def token_from_authorization(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
         return None
@@ -287,12 +292,13 @@ def request_otp(payload: AuthRequest) -> OtpResponse:
         )
 
         try:
-            if payload.contact_mode == "email":
+            if payload.contact_mode == "email" and SMTP_USERNAME and SMTP_PASSWORD:
                 send_email_otp(identifier, code, payload.purpose)
             else:
-                # Phone OTP simulation — do NOT expose the code in production logs
+                # Phone OTP simulation or dev mode - print for developer
                 print(
-                    f"\n[DEVELOPMENT VERIFICATION] Simulated OTP for {identifier} (Purpose: {payload.purpose})\n"
+                    f"\n[DEVELOPMENT OTP] For {identifier} (Purpose: {payload.purpose}): {code}\n"
+                    f"[DEV MODE] Use this code to verify: {code}\n"
                 )
         except Exception:
             connection.rollback()
@@ -303,16 +309,28 @@ def request_otp(payload: AuthRequest) -> OtpResponse:
     is_simulated = (
         not SMTP_USERNAME or not SMTP_PASSWORD or payload.contact_mode == "phone"
     )
-    if is_simulated:
-        msg = "Simulated verification code has been generated. Check server logs for the simulated display message."
-    else:
+
+    # In development mode, always show the OTP
+    dev_mode = is_development_mode()
+    if dev_mode or is_simulated:
+        msg = f"Dev mode: OTP is {code}"
+        # Print prominently for visibility
+        print(f"\n{'='*50}")
+        print(f"  DEVELOPMENT OTP: {code}")
+        print(f"  Identifier: {identifier}")
+        print(f"  Purpose: {payload.purpose}")
+        print(f"{'='*50}\n")
+    elif payload.contact_mode == "email":
         msg = f"Verification code sent to your {payload.contact_mode}."
+    else:
+        msg = "Simulated verification code has been generated."
 
     return OtpResponse(
         message=msg,
         identifier=identifier,
         contact_mode=payload.contact_mode,
         purpose=payload.purpose,
+        dev_otp=code if dev_mode else None,  # Only in dev mode
     )
 
 

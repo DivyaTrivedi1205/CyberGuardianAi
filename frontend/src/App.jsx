@@ -364,8 +364,19 @@ export default function App() {
     if (!deepfakeFile) return
     setIsScanningDeepfake(true)
     try {
+      // Sanitize filename to match backend regex: ^[a-zA-Z0-9._-]+$
+      // Replace spaces with underscores, remove other special characters
+      const sanitizedName = deepfakeFile.name
+        .replace(/\s+/g, '_')  // spaces → underscores
+        .replace(/[^a-zA-Z0-9._\-]/g, '')  // remove special chars except . _ -
+
+      // Create new File object with sanitized name, preserving original type
+      const sanitizedFile = new File([deepfakeFile], sanitizedName, {
+        type: deepfakeFile.type
+      })
+
       const formData = new FormData()
-      formData.append('file', deepfakeFile)
+      formData.append('file', sanitizedFile)
       const response = await fetch(`${API_BASE_URL}/security/analyze-deepfake`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${window.localStorage.getItem(AUTH_TOKEN_KEY) || ''}` },

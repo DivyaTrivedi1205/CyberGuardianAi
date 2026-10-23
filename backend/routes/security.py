@@ -1,6 +1,7 @@
 from typing import List, Optional
 import json
 import os
+import re
 import hashlib
 import pickle
 from pathlib import Path
@@ -467,12 +468,6 @@ async def analyze_deepfake_endpoint(
     ]
     allowed_video_types = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"]
 
-    if content_type not in allowed_image_types + allowed_video_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported content type: {content_type}. Allowed: image/jpeg, image/png, image/webp, image/tiff, image/bmp, video/mp4, video/webm.",
-        )
-
     # Enforce maximum upload size via config
     content = await file.read()
     max_size_bytes = settings.MAX_UPLOAD_SIZE * 1024 * 1024
@@ -489,6 +484,29 @@ async def analyze_deepfake_endpoint(
         raise HTTPException(
             status_code=400,
             detail="Invalid filename — contains disallowed characters.",
+        )
+
+    # If browser didn't detect MIME type (empty or generic), infer from file extension
+    if content_type == "application/octet-stream" or not content_type:
+        ext_to_mime = {
+            ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+            ".png": "image/png", ".webp": "image/webp",
+            ".gif": "image/gif", ".bmp": "image/bmp",
+            ".tiff": "image/tiff", ".tif": "image/tiff",
+            ".mp4": "video/mp4", ".webm": "video/webm",
+            ".mov": "video/quicktime", ".avi": "video/x-msvideo",
+            ".mkv": "video/x-matroska",
+        }
+        ext = os.path.splitext(safe_filename)[1].lower()
+        inferred_type = ext_to_mime.get(ext)
+        if inferred_type:
+            content_type = inferred_type
+
+    # Validate content type against allowed list
+    if content_type not in allowed_image_types + allowed_video_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported content type: {content_type}. Allowed: image/jpeg, image/png, image/webp, image/tiff, image/bmp, video/mp4, video/webm.",
         )
 
     try:

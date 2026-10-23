@@ -1,0 +1,505 @@
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #1e40af;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #22c55e;
+  --bg: #0f172a;
+  --bg-secondary: #1e293b;
+  --text: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border: #334155;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  width: 450px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  font-size: 14px;
+}
+
+.header h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.status {
+  padding: 8px 16px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: none;
+}
+
+.status.show {
+  display: block;
+}
+
+.status.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+}
+
+.status.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.status.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+}
+
+.content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: var(--bg);
+  border-color: var(--primary);
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.analysis-panel {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.analysis-panel.active {
+  display: block;
+}
+
+.input-group {
+  margin-bottom: 12px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+
+.input-field {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--primary);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  color: var(--text);
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.results-panel {
+  display: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.results-panel.active {
+  display: block;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.result-content {
+  display: grid;
+  gap: 16px;
+}
+
+.risk-section {
+  display: grid;
+  gap: 8px;
+}
+
+.score-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.score-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.score-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.risk-category {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: fit-content;
+  display: inline-block;
+}
+
+.risk-category.legitimate {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.risk-category.suspicious {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+}
+
+.risk-category.phishing {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.score-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.explanation-section,
+.features-section,
+.psychology-section {
+  display: grid;
+  gap: 8px;
+}
+
+.explanation-section h3,
+.features-section h3,
+.psychology-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.feedback-list {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.feedback-list li {
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 2px solid var(--primary);
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.features-list,
+.psychology-list {
+  display: grid;
+  gap: 6px;
+}
+
+.feature-badge,
+.psychology-item {
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.feature-badge.threat {
+  border-left: 2px solid var(--danger);
+}
+
+.feature-badge.suspicious {
+  border-left: 2px solid var(--warning);
+}
+
+.feature-badge.safe {
+  border-left: 2px solid var(--success);
+}
+
+.psychology-bar {
+  width: 80px;
+  height: 4px;
+  background: var(--bg);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.psychology-bar-fill {
+  height: 100%;
+  background: var(--warning);
+  border-radius: 2px;
+}
+
+.error-message {
+  display: none;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 2px solid var(--danger);
+  border-radius: 4px;
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.error-message.show {
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.config-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+
+.config-section label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-input-group {
+  display: flex;
+  gap: 6px;
+}
+
+.config-input {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.config-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: none;
+}
+
+.config-status.show {
+  display: block;
+}
+
+.config-status.success {
+  color: #86efac;
+}
+
+.config-status.error {
+  color: #fca5a5;
+}
+
+.footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyberGuardian AI</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <span class="logo-text">CG</span>
+      </div>
+      <h1>CyberGuardian AI</h1>
+    </header>
+
+    <div id="status" class="status"></div>
+
+    <main class="content">
+      <!-- Analysis Mode Selector -->
+      <div class="mode-selector">
+        <button id="urlMode" class="mode-btn active" data-mode="url">
+          <span>🔗</span>
+          <span>URL Check</span>
+        </button>
+        <button id="messageMode" class="mode-btn" data-mode="message">
+          <span>💬</span>
+          <span>Message</span>
+        </button>
+      </div>
+
+      <!-- URL Analysis Panel -->
+      <div id="urlPanel" class="analysis-panel active">
+        <div class="input-group">
+          <label for="urlInput">Enter URL to analyze</label>
+          <input
+            id="urlInput"
+            type="text"
+            placeholder="https://example.com"
+            class="input-field"
+          />
+        </div>
+        <button id="analyzeUrlBtn" class="btn-primary">
+          <span>Analyze URL</span>
+          <span id="urlSpinner" class="spinner hidden"></span>
+        </button>
+      </div>
+
+      <!-- Message Analysis Panel -->
+      <div id="messagePanel" class="analysis-panel hidden">
+        <div class="input-group">
+          <label for="messageInput">Enter text to analyze</label>
+          <textarea
+            id="messageInput"
+            placeholder="Paste message or email text..."
+            class="input-field"
+            rows="3"
+          ></textarea>
+        </div>
+        <button id="analyzeMessageBtn" class="btn-primary">
+          <span>Analyze Message</span>
+          <span id="messageSpinner" class="spinner hidden"></span>
+        </button>
+      </div>
+
+      <!-- Results Panel -->
+      <div id="results" class="results-panel hidden">
+        <div class="result-header">
+          <h2 id="resultTitle">Analysis Result</h2>
+          <button id="closeResults" class="btn-close">×</button>
+        </div>
+
+        <div id="resultContent" class="result-content">
+          <!-- Risk Score -->
+          <div class="risk-section">
+            <div class="score-display">
+              <span id="riskScore" class="score-number">—</span>
+              <span class="score-unit">/100</span>
+            </div>
+            <span id="riskCategory" class="risk-category">Analyzing...</span>
+            <div class="score-bar">
+              <div id="scoreBar" class="score-fill"></div>
+            </div>
+          </div>
+
+          <!-- Explanation -->
+          <div class="explanation-section">
+            <h3>Risk Signals</h3>
+            <ul id="feedbackList" class="feedback-list"></ul>
+          </div>
+
+          <!-- Features (for URLs) -->
+          <div id="featuresSection" class="features-section hidden">
+            <h3>Analysis Features</h3>
+            <div id="featuresList" class="features-list"></div>
+          </div>
+
+          <!-- Psychology Signals (for URLs) -->
+          <div id="psychologySection" class="psychology-section hidden">
+            <h3>Scam Psychology Triggers</h3>
+            <div id="psychologyList" class="psychology-list"></div>
+          </div>
+
+          <!-- Error Message -->
+          <div id="errorMessage" class="error-message hidden"></div>
+        </div>
+      </div>
+
+      <!-- Configuration -->
+      <div class="config-section">
+        <label for="backendUrl">Backend URL:</label>
+        <div class="config-input-group">
+          <input
+            id="backendUrl"
+            type="text"
+            placeholder="http://127.0.0.1:8000"
+            class="config-input"
+          />
+          <button id="saveConfig" class="btn-secondary">Save</button>
+        </div>
+        <div id="configStatus" class="config-status"></div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>CyberGuardian AI v1.0 • <a href="#" id="settingsLink">Settings</a></p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

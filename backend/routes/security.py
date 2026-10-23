@@ -7,6 +7,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File
 from psycopg2.extras import RealDictCursor
 from database.connection import db_connection, now_ts
+from database.scan_repository import (
+    save_url_scan,
+    get_url_scans_history,
+    save_message_scan,
+    get_message_scans_history,
+    save_deepfake_scan,
+    get_deepfake_scans_history,
+)
 from models.auth import UserOut
 from models.security import (
     PasswordAnalysisRequest,
@@ -237,22 +245,7 @@ def analyze_url(
                 if current_user and url:
                     with db_connection() as connection:
                         try:
-                            timestamp = now_ts()
-                            with connection.cursor() as cursor:
-                                cursor.execute(
-                                    """
-                                    INSERT INTO url_scans (user_id, url, risk_score, prediction, features, created_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s)
-                                    """,
-                                    (
-                                        current_user.id,
-                                        url,
-                                        risk_score,
-                                        prediction,
-                                        json.dumps(features),
-                                        timestamp,
-                                    ),
-                                )
+                            save_url_scan(connection, current_user.id, url, risk_score, prediction, features, now_ts())
                             connection.commit()
                         except Exception:
                             connection.rollback()
@@ -312,22 +305,7 @@ def analyze_url(
     if current_user and url:
         with db_connection() as connection:
             try:
-                timestamp = now_ts()
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO url_scans (user_id, url, risk_score, prediction, features, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            current_user.id,
-                            url,
-                            risk_score,
-                            prediction,
-                            json.dumps(features),
-                            timestamp,
-                        ),
-                    )
+                save_url_scan(connection, current_user.id, url, risk_score, prediction, features, now_ts())
                 connection.commit()
             except Exception as exc:
                 connection.rollback()
@@ -371,25 +349,7 @@ def get_url_scans(
     current_user: UserOut = Depends(get_current_user),
 ) -> List[UrlScanHistoryItem]:
     with db_connection() as connection:
-        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(
-                """
-                SELECT id, user_id, url, risk_score, prediction, features, created_at
-                FROM url_scans
-                WHERE user_id = %s
-                ORDER BY created_at DESC
-                LIMIT 50
-                """,
-                (current_user.id,),
-            )
-            rows = cursor.fetchall()
-            results = []
-            for row in rows:
-                record = dict(row)
-                if isinstance(record["features"], str):
-                    record["features"] = json.loads(record["features"])
-                results.append(record)
-            return results
+        return get_url_scans_history(connection, current_user.id)
 
 
 # --- Message/Email Risk Analyzer Endpoints ---
@@ -416,22 +376,7 @@ def analyze_message(
                 if current_user and message:
                     with db_connection() as connection:
                         try:
-                            timestamp = now_ts()
-                            with connection.cursor() as cursor:
-                                cursor.execute(
-                                    """
-                                    INSERT INTO message_scans (user_id, message, risk_score, prediction, features, created_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s)
-                                    """,
-                                    (
-                                        current_user.id,
-                                        message,
-                                        risk_score,
-                                        prediction,
-                                        json.dumps({}),
-                                        timestamp,
-                                    ),
-                                )
+                            save_message_scan(connection, current_user.id, message, risk_score, prediction, {}, now_ts())
                             connection.commit()
                         except Exception:
                             connection.rollback()
@@ -466,22 +411,7 @@ def analyze_message(
     if current_user and message:
         with db_connection() as connection:
             try:
-                timestamp = now_ts()
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO message_scans (user_id, message, risk_score, prediction, features, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            current_user.id,
-                            message,
-                            analysis["risk_score"],
-                            analysis["prediction"],
-                            json.dumps({}),
-                            timestamp,
-                        ),
-                    )
+                save_message_scan(connection, current_user.id, message, analysis["risk_score"], analysis["prediction"], {}, now_ts())
                 connection.commit()
             except Exception as exc:
                 connection.rollback()
@@ -514,25 +444,7 @@ def get_message_scans(
     current_user: UserOut = Depends(get_current_user),
 ) -> List[MessageScanHistoryItem]:
     with db_connection() as connection:
-        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(
-                """
-                SELECT id, user_id, message, risk_score, prediction, features, created_at
-                FROM message_scans
-                WHERE user_id = %s
-                ORDER BY created_at DESC
-                LIMIT 50
-                """,
-                (current_user.id,),
-            )
-            rows = cursor.fetchall()
-            results = []
-            for row in rows:
-                record = dict(row)
-                if isinstance(record["features"], str):
-                    record["features"] = json.loads(record["features"])
-                results.append(record)
-            return results
+        return get_message_scans_history(connection, current_user.id)
 
 
 # --- Deepfake Analysis Endpoint ---
@@ -599,23 +511,16 @@ async def analyze_deepfake_endpoint(
     if current_user:
         with db_connection() as connection:
             try:
-                timestamp = now_ts()
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO deepfake_scans (user_id, file_name, file_type, risk_score, prediction, features, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            current_user.id,
-                            analysis["metadata"]["file_name"],
-                            analysis["file_type"],
-                            analysis["risk_score"],
-                            analysis["prediction"],
-                            json.dumps(analysis["features"]),
-                            timestamp,
-                        ),
-                    )
+                save_deepfake_scan(
+                    connection,
+                    current_user.id,
+                    analysis["metadata"]["file_name"],
+                    analysis["file_type"],
+                    analysis["risk_score"],
+                    analysis["prediction"],
+                    analysis["features"],
+                    now_ts(),
+                )
                 connection.commit()
             except Exception as exc:
                 connection.rollback()
@@ -648,22 +553,4 @@ def get_deepfake_scans(
     current_user: UserOut = Depends(get_current_user),
 ) -> List[DeepfakeScanHistoryItem]:
     with db_connection() as connection:
-        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(
-                """
-                SELECT id, user_id, file_name, file_type, risk_score, prediction, features, created_at
-                FROM deepfake_scans
-                WHERE user_id = %s
-                ORDER BY created_at DESC
-                LIMIT 50
-                """,
-                (current_user.id,),
-            )
-            rows = cursor.fetchall()
-            results = []
-            for row in rows:
-                record = dict(row)
-                if isinstance(record["features"], str):
-                    record["features"] = json.loads(record["features"])
-                results.append(record)
-            return results
+        return get_deepfake_scans_history(connection, current_user.id)

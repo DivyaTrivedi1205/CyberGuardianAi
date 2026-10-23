@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react'
+import { apiRequest, readJsonResponse, API_BASE_URL, AUTH_TOKEN_KEY, AUTH_USER_KEY } from './api/client'
+import { scorePassword, generatePassword, getPasswordSuggestions } from './utils/helpers'
+import { PasswordAnalyzer } from './features/PasswordAnalyzer'
 
 const quickStats = [
   { label: 'Protected sessions', value: '1.8k', detail: '+14% this week' },
@@ -11,112 +14,6 @@ const signals = [
   'Flags common patterns used in credential stuffing',
   'Produces a plain-language risk summary for users',
 ]
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-const AUTH_TOKEN_KEY = 'cyberguardian-auth-token'
-const AUTH_USER_KEY = 'cyberguardian-auth-user'
-
-async function readJsonResponse(response) {
-  const text = await response.text()
-  if (!text) return null
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { detail: text }
-  }
-}
-
-async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-  })
-
-  const payload = await readJsonResponse(response)
-
-  if (!response.ok) {
-    const message = payload?.detail || payload?.message || 'Something went wrong.'
-    throw new Error(message)
-  }
-
-  return payload
-}
-
-function scorePassword(value) {
-  let score = 0
-  const feedback = []
-
-  if (value.length >= 12) score += 30
-  else if (value.length >= 8) score += 18
-  else if (value.length > 0) feedback.push('Use at least 12 characters for better resilience.')
-
-  if (/[a-z]/.test(value)) score += 10
-  else if (value.length > 0) feedback.push('Add lowercase letters.')
-
-  if (/[A-Z]/.test(value)) score += 10
-  else if (value.length > 0) feedback.push('Add uppercase letters.')
-
-  if (/\d/.test(value)) score += 15
-  else if (value.length > 0) feedback.push('Add numbers.')
-
-  if (/[^A-Za-z0-9]/.test(value)) score += 15
-  else if (value.length > 0) feedback.push('Add a symbol or punctuation mark.')
-
-  if (/(.)\1\1/.test(value)) {
-    score -= 10
-    feedback.push('Avoid repeated characters or obvious patterns.')
-  }
-
-  if (/password|welcome|admin|qwerty|letmein/i.test(value)) {
-    score -= 20
-    feedback.push('This contains a very common password pattern.')
-  }
-
-  const clamped = Math.max(0, Math.min(100, score))
-  const grade = clamped >= 80 ? 'Strong' : clamped >= 55 ? 'Moderate' : clamped >= 30 ? 'Weak' : 'Critical'
-
-  return {
-    score: clamped,
-    grade,
-    feedback: feedback.length > 0 ? feedback : ['No obvious weaknesses detected in this quick check.'],
-  }
-}
-
-function generatePassword(length = 16) {
-  const lowercase = 'abcdefghijkmnopqrstuvwxyz'
-  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const numbers = '23456789'
-  const symbols = '!@#$%^&*()-_=+[]{};:,.?'
-  const allCharacters = lowercase + uppercase + numbers + symbols
-
-  const requiredCharacters = [
-    lowercase[Math.floor(Math.random() * lowercase.length)],
-    uppercase[Math.floor(Math.random() * uppercase.length)],
-    numbers[Math.floor(Math.random() * numbers.length)],
-    symbols[Math.floor(Math.random() * symbols.length)],
-  ]
-
-  const remainingCharacters = Array.from({ length: Math.max(length - requiredCharacters.length, 0) }, () => {
-    return allCharacters[Math.floor(Math.random() * allCharacters.length)]
-  })
-
-  return [...requiredCharacters, ...remainingCharacters].sort(() => Math.random() - 0.5).join('')
-}
-
-function getPasswordSuggestions(password) {
-  const suggestions = []
-  if (password.length < 12) suggestions.push('Use at least 12 characters for stronger protection.')
-  if (!/[a-z]/.test(password)) suggestions.push('Add lowercase letters.')
-  if (!/[A-Z]/.test(password)) suggestions.push('Add uppercase letters.')
-  if (!/\d/.test(password)) suggestions.push('Add numbers.')
-  if (!/[^A-Za-z0-9]/.test(password)) suggestions.push('Add a symbol or punctuation mark.')
-  if (/(.)\1\1/.test(password)) suggestions.push('Avoid repeated characters or obvious patterns.')
-  if (/password|welcome|admin|qwerty|letmein/i.test(password)) suggestions.push('Remove common password words or keyboard patterns.')
-  return suggestions.length > 0 ? suggestions : ['This password looks stronger than average in this quick check.']
-}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -132,23 +29,21 @@ export default function App() {
   const [otpSent, setOtpSent] = useState(false)
   const [otpValue, setOtpValue] = useState('')
 
-  // Password Analyzer States
-  const [analyzerInput, setAnalyzerInput] = useState('')
-  const [analyzerResult, setAnalyzerResult] = useState(null)
-  const [generatedPassword, setGeneratedPassword] = useState('')
+  // Scan history (all types) — fetched once after login and refreshed after each scan
   const [scanHistory, setScanHistory] = useState([])
+  const [urlScanHistory, setUrlScanHistory] = useState([])
+  const [messageScanHistory, setMessageScanHistory] = useState([])
+  const [deepfakeScanHistory, setDeepfakeScanHistory] = useState([])
 
   // URL Analyzer States
   const [urlInput, setUrlInput] = useState('')
   const [urlResult, setUrlResult] = useState(null)
   const [isScanningUrl, setIsScanningUrl] = useState(false)
-  const [urlScanHistory, setUrlScanHistory] = useState([])
 
   // Message Analyzer States
   const [messageInput, setMessageInput] = useState('')
   const [messageResult, setMessageResult] = useState(null)
   const [isScanningMessage, setIsScanningMessage] = useState(false)
-  const [messageScanHistory, setMessageScanHistory] = useState([])
 
   // CrowdShield (Community Intelligence) States
   const [communityReports, setCommunityReports] = useState([])
@@ -165,7 +60,6 @@ export default function App() {
   const [deepfakePreviewUrl, setDeepfakePreviewUrl] = useState(null)
   const [deepfakeResult, setDeepfakeResult] = useState(null)
   const [isScanningDeepfake, setIsScanningDeepfake] = useState(false)
-  const [deepfakeScanHistory, setDeepfakeScanHistory] = useState([])
 
   async function fetchCommunityReports() {
     try {
@@ -182,11 +76,8 @@ export default function App() {
 
     setIsReporting(true)
     try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
       await apiRequest('/community/report', {
         method: 'POST',
-        headers,
         body: JSON.stringify({
           indicator_type: reportType,
           indicator_value: reportValue,
@@ -205,13 +96,7 @@ export default function App() {
 
   async function handleVerifyReport(id) {
     try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      if (!token) return
-      const headers = { Authorization: `Bearer ${token}` }
-      await apiRequest(`/community/verify/${id}`, {
-        method: 'POST',
-        headers
-      })
+      await apiRequest(`/community/verify/${id}`, { method: 'POST' })
       fetchCommunityReports()
     } catch (error) {
       console.error('Failed to verify community report:', error)
@@ -223,15 +108,11 @@ export default function App() {
     setIsCommunityLookingUp(true)
     setCommunityLookupResult(null)
     try {
-      const match = communityReports.find(r => 
+      const match = communityReports.find(r =>
         r.indicator_value.toLowerCase().includes(communitySearchQuery.toLowerCase()) ||
         communitySearchQuery.toLowerCase().includes(r.indicator_value.toLowerCase())
       )
-      if (match) {
-        setCommunityLookupResult(match)
-      } else {
-        setCommunityLookupResult({ status: 'clean', indicator_value: communitySearchQuery })
-      }
+      setCommunityLookupResult(match ?? { status: 'clean', indicator_value: communitySearchQuery })
     } catch (error) {
       console.error('Reputation lookup failed:', error)
     } finally {
@@ -243,12 +124,11 @@ export default function App() {
     const storedToken = token || window.localStorage.getItem(AUTH_TOKEN_KEY)
     if (!storedToken) return
     try {
-      const headers = { Authorization: `Bearer ${storedToken}` }
       const [passHist, urlHist, msgHist, dfHist] = await Promise.all([
-        apiRequest('/security/password-scans', { headers }).catch(() => []),
-        apiRequest('/security/url-scans', { headers }).catch(() => []),
-        apiRequest('/security/message-scans', { headers }).catch(() => []),
-        apiRequest('/security/deepfake-scans', { headers }).catch(() => [])
+        apiRequest('/security/password-scans').catch(() => []),
+        apiRequest('/security/url-scans').catch(() => []),
+        apiRequest('/security/message-scans').catch(() => []),
+        apiRequest('/security/deepfake-scans').catch(() => [])
       ])
       setScanHistory(passHist)
       setUrlScanHistory(urlHist)
@@ -265,20 +145,13 @@ export default function App() {
     const storedUser = window.localStorage.getItem(AUTH_USER_KEY)
 
     if (!storedToken) {
-      if (storedUser) {
-        window.localStorage.removeItem(AUTH_USER_KEY)
-      }
+      if (storedUser) window.localStorage.removeItem(AUTH_USER_KEY)
       return
     }
 
     async function restoreSession() {
       try {
-        const user = await apiRequest('/auth/me', {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
-        })
-
+        const user = await apiRequest('/auth/me')
         setIsAuthenticated(true)
         setCurrentUser(user)
         setDisplayName(user.name)
@@ -310,16 +183,13 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated && !showGuestShell && window.google) {
       const timer = setTimeout(() => {
-        const btnEl = document.getElementById("google-signin-btn")
+        const btnEl = document.getElementById('google-signin-btn')
         if (btnEl) {
           window.google.accounts.id.initialize({
-            client_id: "48190723181-pf48lpee9226voi06h554qq5r93hchbb.apps.googleusercontent.com",
+            client_id: '48190723181-pf48lpee9226voi06h554qq5r93hchbb.apps.googleusercontent.com',
             callback: handleGoogleCredentialResponse,
           })
-          window.google.accounts.id.renderButton(
-            btnEl,
-            { theme: "outline", size: "large", width: "100%" }
-          )
+          window.google.accounts.id.renderButton(btnEl, { theme: 'outline', size: 'large', width: '100%' })
         }
       }, 150)
       return () => clearTimeout(timer)
@@ -360,12 +230,10 @@ export default function App() {
       setAuthMessage('Add your name before requesting an OTP.')
       return false
     }
-
     if (!identityValue.trim()) {
       setAuthMessage(`Enter your ${contactMode === 'phone' ? 'phone number' : 'email address'} first.`)
       return false
     }
-
     try {
       const response = await apiRequest('/auth/request-otp', {
         method: 'POST',
@@ -376,7 +244,6 @@ export default function App() {
           display_name: authTab === 'signup' ? displayName.trim() : undefined,
         }),
       })
-
       setAuthMessage(response.message)
       setOtpSent(true)
       return true
@@ -388,17 +255,14 @@ export default function App() {
 
   async function handleAuthSubmit(event) {
     event.preventDefault()
-
     if (!otpSent) {
       await requestOtp()
       return
     }
-
     if (!otpValue.trim()) {
       setAuthMessage('Enter the OTP you received to continue.')
       return
     }
-
     try {
       const response = await apiRequest('/auth/verify-otp', {
         method: 'POST',
@@ -410,103 +274,41 @@ export default function App() {
           display_name: authTab === 'signup' ? displayName.trim() : undefined,
         }),
       })
-
       await persistSession(response.access_token, response.user, contactMode === 'phone' ? 'Phone OTP' : 'Email OTP')
     } catch (error) {
       setAuthMessage(error.message)
     }
   }
 
-  function switchToLogin() {
-    setAuthTab('login')
-    setAuthMessage('')
-    setOtpSent(false)
-    setOtpValue('')
-  }
+  function switchToLogin() { setAuthTab('login'); setAuthMessage(''); setOtpSent(false); setOtpValue('') }
+  function switchToSignup() { setAuthTab('signup'); setAuthMessage(''); setOtpSent(false); setOtpValue('') }
+  function handleContinueAsGuest() { setShowGuestShell(true); setAuthMessage('Guest mode is active. Sign in to unlock the protected features.') }
+  function returnToDashboard() { setActivePage('dashboard') }
 
-  function switchToSignup() {
-    setAuthTab('signup')
-    setAuthMessage('')
-    setOtpSent(false)
-    setOtpValue('')
-  }
-
-  function handleContinueAsGuest() {
-    setShowGuestShell(true)
-    setAuthMessage('Guest mode is active. Sign in to unlock the protected features.')
-  }
-
-  function openPasswordAnalyzer() {
-    setActivePage('password-analyzer')
-  }
-
-  function returnToDashboard() {
+  function signOut() {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY)
+    window.localStorage.removeItem(AUTH_USER_KEY)
+    setIsAuthenticated(false)
+    setCurrentUser(null)
     setActivePage('dashboard')
   }
 
-  async function runAnalyzer() {
-    if (!analyzerInput.trim()) {
-      return
-    }
-
-    try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      
-      const result = await apiRequest('/security/analyze-password', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ password: analyzerInput }),
-      })
-
-      setAnalyzerResult({
-        score: result.score,
-        grade: result.grade,
-        suggestions: result.feedback,
-        feedback: result.feedback,
-      })
-
-      if (token) {
-        fetchHistories(token)
-      }
-    } catch (error) {
-      console.error('Failed to analyze password via backend:', error)
-      const result = scorePassword(analyzerInput)
-      setAnalyzerResult({
-        score: result.score,
-        grade: result.grade,
-        suggestions: getPasswordSuggestions(analyzerInput),
-        feedback: result.feedback,
-      })
-    }
-  }
-
   async function runUrlAnalyzer() {
-    if (!urlInput.trim()) {
-      return
-    }
-
+    if (!urlInput.trim()) return
     setIsScanningUrl(true)
     try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      
       const result = await apiRequest('/security/analyze-url', {
         method: 'POST',
-        headers,
         body: JSON.stringify({ url: urlInput }),
       })
-
       setUrlResult({
         prediction: result.prediction,
         risk_score: result.risk_score,
         features: result.features,
         feedback: result.feedback,
+        scam_psychology: result.scam_psychology,
       })
-
-      if (token) {
-        fetchHistories(token)
-      }
+      if (isAuthenticated) fetchHistories()
     } catch (error) {
       console.error('Failed to analyze URL via backend:', error)
       setUrlResult({
@@ -521,30 +323,20 @@ export default function App() {
   }
 
   async function runMessageAnalyzer() {
-    if (!messageInput.trim()) {
-      return
-    }
-
+    if (!messageInput.trim()) return
     setIsScanningMessage(true)
     try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      
       const result = await apiRequest('/security/analyze-message', {
         method: 'POST',
-        headers,
         body: JSON.stringify({ message: messageInput }),
       })
-
       setMessageResult({
         prediction: result.prediction,
         risk_score: result.risk_score,
         feedback: result.feedback,
+        scam_psychology: result.scam_psychology,
       })
-
-      if (token) {
-        fetchHistories(token)
-      }
+      if (isAuthenticated) fetchHistories()
     } catch (error) {
       console.error('Failed to analyze message via backend:', error)
       setMessageResult({
@@ -558,29 +350,18 @@ export default function App() {
   }
 
   async function runDeepfakeAnalyzer() {
-    if (!deepfakeFile) {
-      return
-    }
-
+    if (!deepfakeFile) return
     setIsScanningDeepfake(true)
     try {
-      const token = window.localStorage.getItem(AUTH_TOKEN_KEY)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      
       const formData = new FormData()
       formData.append('file', deepfakeFile)
-
       const response = await fetch(`${API_BASE_URL}/security/analyze-deepfake`, {
         method: 'POST',
-        headers,
+        headers: { Authorization: `Bearer ${window.localStorage.getItem(AUTH_TOKEN_KEY) || ''}` },
         body: formData,
       })
-
       const result = await readJsonResponse(response)
-      if (!response.ok) {
-        throw new Error(result?.detail || result?.message || 'Deepfake analysis failed.')
-      }
-
+      if (!response.ok) throw new Error(result?.detail || result?.message || 'Deepfake analysis failed.')
       setDeepfakeResult({
         file_name: result.file_name,
         file_type: result.file_type,
@@ -590,10 +371,7 @@ export default function App() {
         feedback: result.feedback,
         metadata: result.metadata
       })
-
-      if (token) {
-        fetchHistories(token)
-      }
+      if (isAuthenticated) fetchHistories()
     } catch (error) {
       console.error('Failed to analyze deepfake via backend:', error)
       setDeepfakeResult({
@@ -610,91 +388,28 @@ export default function App() {
     }
   }
 
-  function handleGeneratePassword() {
-    const nextPassword = generatePassword(16)
-    setGeneratedPassword(nextPassword)
-    setAnalyzerInput(nextPassword)
-    setAnalyzerResult(null)
-  }
-
-  function handleContactModeChange(mode) {
-    setContactMode(mode)
-    setAuthMessage('')
-    setOtpSent(false)
-    setOtpValue('')
-  }
+  function handleContactModeChange(mode) { setContactMode(mode); setAuthMessage(''); setOtpSent(false); setOtpValue('') }
 
   function handleDeepfakeFileChange(file) {
     if (!file) return
     setDeepfakeFile(file)
     setDeepfakeResult(null)
-    if (deepfakePreviewUrl) {
-      URL.revokeObjectURL(deepfakePreviewUrl)
-    }
+    if (deepfakePreviewUrl) URL.revokeObjectURL(deepfakePreviewUrl)
     setDeepfakePreviewUrl(URL.createObjectURL(file))
   }
+
+  // ── Navigation ───────────────────────────────────────────────────────────
 
   function renderSidebarNav() {
     return (
       <nav className="sidebar-nav" aria-label="Primary">
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActivePage('dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'password-analyzer' ? 'active' : ''}`}
-          onClick={() => setActivePage('password-analyzer')}
-        >
-          Password Analyzer
-        </button>
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'url-analyzer' ? 'active' : ''}`}
-          onClick={() => setActivePage('url-analyzer')}
-        >
-          URL Risk Analyzer
-        </button>
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'message-analyzer' ? 'active' : ''}`}
-          onClick={() => setActivePage('message-analyzer')}
-        >
-          Message Analyzer
-        </button>
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'deepfake-analyzer' ? 'active' : ''}`}
-          onClick={() => setActivePage('deepfake-analyzer')}
-        >
-          Deepfake Analyzer
-        </button>
-        <button
-          type="button"
-          className={`sidebar-nav-button ${activePage === 'crowdshield' ? 'active' : ''}`}
-          onClick={() => {
-            setActivePage('crowdshield');
-            fetchCommunityReports();
-          }}
-        >
-          CrowdShield Feed
-        </button>
-        <button
-          type="button"
-          className="sidebar-nav-button"
-          onClick={() => {
-            window.localStorage.removeItem(AUTH_TOKEN_KEY)
-            window.localStorage.removeItem(AUTH_USER_KEY)
-            setIsAuthenticated(false)
-            setCurrentUser(null)
-            setActivePage('dashboard')
-          }}
-        >
-          Sign out
-        </button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'dashboard' ? 'active' : ''}`} onClick={() => setActivePage('dashboard')}>Dashboard</button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'password-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('password-analyzer')}>Password Analyzer</button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'url-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('url-analyzer')}>URL Risk Analyzer</button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'message-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('message-analyzer')}>Message Analyzer</button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'deepfake-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('deepfake-analyzer')}>Deepfake Analyzer</button>
+        <button type="button" className={`sidebar-nav-button ${activePage === 'crowdshield' ? 'active' : ''}`} onClick={() => { setActivePage('crowdshield'); fetchCommunityReports() }}>CrowdShield Feed</button>
+        <button type="button" className="sidebar-nav-button" onClick={signOut}>Sign out</button>
       </nav>
     )
   }
@@ -711,91 +426,38 @@ export default function App() {
           {isGuest ? (
             <>
               <a href="#dashboard" className="top-navbar-link active">Dashboard</a>
-              <button type="button" className="top-navbar-link" onClick={() => setShowGuestShell(false)}>
-                Authentication
-              </button>
+              <button type="button" className="top-navbar-link" onClick={() => setShowGuestShell(false)}>Authentication</button>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setActivePage('dashboard')}
-              >
-                Dashboard
-              </button>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'password-analyzer' ? 'active' : ''}`}
-                onClick={() => setActivePage('password-analyzer')}
-              >
-                Password Analyzer
-              </button>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'url-analyzer' ? 'active' : ''}`}
-                onClick={() => setActivePage('url-analyzer')}
-              >
-                URL Risk Analyzer
-              </button>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'message-analyzer' ? 'active' : ''}`}
-                onClick={() => setActivePage('message-analyzer')}
-              >
-                Message Analyzer
-              </button>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'deepfake-analyzer' ? 'active' : ''}`}
-                onClick={() => setActivePage('deepfake-analyzer')}
-              >
-                Deepfake Analyzer
-              </button>
-              <button
-                type="button"
-                className={`top-navbar-link ${activePage === 'crowdshield' ? 'active' : ''}`}
-                onClick={() => {
-                  setActivePage('crowdshield');
-                  fetchCommunityReports();
-                }}
-              >
-                CrowdShield Feed
-              </button>
+              <button type="button" className={`top-navbar-link ${activePage === 'dashboard' ? 'active' : ''}`} onClick={() => setActivePage('dashboard')}>Dashboard</button>
+              <button type="button" className={`top-navbar-link ${activePage === 'password-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('password-analyzer')}>Password Analyzer</button>
+              <button type="button" className={`top-navbar-link ${activePage === 'url-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('url-analyzer')}>URL Risk Analyzer</button>
+              <button type="button" className={`top-navbar-link ${activePage === 'message-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('message-analyzer')}>Message Analyzer</button>
+              <button type="button" className={`top-navbar-link ${activePage === 'deepfake-analyzer' ? 'active' : ''}`} onClick={() => setActivePage('deepfake-analyzer')}>Deepfake Analyzer</button>
+              <button type="button" className={`top-navbar-link ${activePage === 'crowdshield' ? 'active' : ''}`} onClick={() => { setActivePage('crowdshield'); fetchCommunityReports() }}>CrowdShield Feed</button>
             </>
           )}
         </div>
 
         <div className="top-navbar-right">
           {isGuest ? (
-            <button type="button" className="primary-button" style={{ padding: '8px 16px' }} onClick={() => setShowGuestShell(false)}>
-              Back to Sign In
-            </button>
+            <button type="button" className="primary-button" style={{ padding: '8px 16px' }} onClick={() => setShowGuestShell(false)}>Back to Sign In</button>
           ) : (
             <>
               <div className="top-navbar-user">
                 <span className="top-navbar-user-name">{currentUser?.name || displayName || 'User'}</span>
                 <span className="top-navbar-user-status">● {authMethod} Unlocked</span>
               </div>
-              <button
-                type="button"
-                className="top-navbar-signout"
-                onClick={() => {
-                  window.localStorage.removeItem(AUTH_TOKEN_KEY)
-                  window.localStorage.removeItem(AUTH_USER_KEY)
-                  setIsAuthenticated(false)
-                  setCurrentUser(null)
-                  setActivePage('dashboard')
-                }}
-              >
-                Sign Out
-              </button>
+              <button type="button" className="top-navbar-signout" onClick={signOut}>Sign Out</button>
             </>
           )}
         </div>
       </nav>
-    );
+    )
   }
+
+  // ── Views ────────────────────────────────────────────────────────────────
 
   function renderDashboardView() {
     const liveStats = [
@@ -820,12 +482,8 @@ export default function App() {
           </div>
           {isAuthenticated && (
             <div style={{ display: 'flex', gap: '8px' }}>
-               <button type="button" className="primary-button" onClick={() => setActivePage('url-analyzer')}>
-                 Scan URL
-               </button>
-               <button type="button" className="secondary-button" onClick={() => setActivePage('message-analyzer')}>
-                 Analyze SMS
-               </button>
+              <button type="button" className="primary-button" onClick={() => setActivePage('url-analyzer')}>Scan URL</button>
+              <button type="button" className="secondary-button" onClick={() => setActivePage('message-analyzer')}>Analyze SMS</button>
             </div>
           )}
         </header>
@@ -875,12 +533,8 @@ export default function App() {
                 <h3>Go back to the login page.</h3>
                 <p>Complete sign-in or registration to unlock the platform.</p>
                 <div className="auth-actions">
-                  <button type="button" className="primary-button" onClick={() => setShowGuestShell(false)}>
-                    Sign in
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => setShowGuestShell(false)}>
-                    Create account
-                  </button>
+                  <button type="button" className="primary-button" onClick={() => setShowGuestShell(false)}>Sign in</button>
+                  <button type="button" className="secondary-button" onClick={() => setShowGuestShell(false)}>Create account</button>
                 </div>
               </>
             )}
@@ -889,9 +543,9 @@ export default function App() {
           <article className="panel history-panel">
             <p className="eyebrow">Recent Activity Log</p>
             <h3>Recent Scans Overview</h3>
-            
+
             <div style={{ display: 'grid', gap: '10px' }}>
-              {urlScanHistory.length > 0 ? (
+              {urlScanHistory.length > 0 && (
                 <div className="history-item" style={{ cursor: 'pointer' }} onClick={() => isAuthenticated && setActivePage('url-analyzer')}>
                   <div className="history-meta">
                     <span className="history-text">{urlScanHistory[0].url}</span>
@@ -902,9 +556,9 @@ export default function App() {
                     <span className="history-score">{urlScanHistory[0].risk_score}/100</span>
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {messageScanHistory.length > 0 ? (
+              {messageScanHistory.length > 0 && (
                 <div className="history-item" style={{ cursor: 'pointer' }} onClick={() => isAuthenticated && setActivePage('message-analyzer')}>
                   <div className="history-meta">
                     <span className="history-text">{messageScanHistory[0].message}</span>
@@ -915,9 +569,9 @@ export default function App() {
                     <span className="history-score">{messageScanHistory[0].risk_score}/100</span>
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {scanHistory.length > 0 ? (
+              {scanHistory.length > 0 && (
                 <div className="history-item" style={{ cursor: 'pointer' }} onClick={() => isAuthenticated && setActivePage('password-analyzer')}>
                   <div className="history-meta">
                     <span className="history-text">•••••••••••• ({scanHistory[0].password_length} chars)</span>
@@ -928,153 +582,15 @@ export default function App() {
                     <span className="history-score">{scanHistory[0].score}/100</span>
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {scanHistory.length === 0 && urlScanHistory.length === 0 && messageScanHistory.length === 0 ? (
+              {scanHistory.length === 0 && urlScanHistory.length === 0 && messageScanHistory.length === 0 && (
                 <p className="hero-copy">No previous scans found. Select an analyzer to run a check.</p>
-              ) : null}
+              )}
             </div>
           </article>
         </section>
       </>
-    )
-  }
-
-  function renderPasswordAnalyzerView() {
-    return (
-      <div className="analyzer-page-view">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Security tools</p>
-            <h2>Password Analyzer</h2>
-          </div>
-          <button type="button" className="primary-button" onClick={returnToDashboard}>
-            Back to dashboard
-          </button>
-        </header>
-
-        <section className="hero-card analyzer-hero">
-          <div>
-            <p className="eyebrow">Check and improve</p>
-            <h3>Type a password, check the risk score, and generate a stronger one if needed.</h3>
-            <p className="hero-copy">
-              This page gives a simple risk score, human suggestions, and a built-in password generator to help users recover quickly.
-            </p>
-          </div>
-          <div className="hero-panel">
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Risk scoring and suggestions update after you press Check.</span>
-            </div>
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Generate a new password if you want a stronger starting point.</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="analyzer-grid">
-          <article className="panel analyzer-form-card">
-            <p className="eyebrow">Password check</p>
-            <h3>Try a password</h3>
-
-            <label className="field-label" htmlFor="analyzer-input">
-              Password
-            </label>
-            <textarea
-              id="analyzer-input"
-              className="analyzer-textarea"
-              value={analyzerInput}
-              onChange={(event) => setAnalyzerInput(event.target.value)}
-              placeholder="Enter a password to check"
-              rows={4}
-            />
-
-            <div className="auth-actions">
-              <button type="button" className="primary-button" onClick={runAnalyzer}>
-                Check Strength
-              </button>
-              <button type="button" className="secondary-button" onClick={handleGeneratePassword}>
-                Generate Secure Password
-              </button>
-            </div>
-          </article>
-
-          <article className="panel analyzer-result-card">
-            <p className="eyebrow">Results</p>
-            <h3>{analyzerResult ? 'Evaluation Complete' : 'No evaluation run yet'}</h3>
-
-            {analyzerResult ? (
-              <>
-                <div className="score-row analyzer-score-row">
-                  <div>
-                    <p className="score-label">Score</p>
-                    <strong className="score-value">{analyzerResult.score}/100</strong>
-                  </div>
-                  <div className="score-meter">
-                    <span style={{ width: `${analyzerResult.score}%`, background: analyzerResult.score >= 70 ? '#22c55e' : analyzerResult.score >= 35 ? '#f59e0b' : '#ef4444' }} />
-                  </div>
-                </div>
-
-                <p className="score-label">Suggestions for improvement:</p>
-                <ul className="feedback-list">
-                  {analyzerResult.suggestions.map((suggestion) => (
-                    <li key={suggestion}>{suggestion}</li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="hero-copy">
-                Type a password in the field and click Check Strength to evaluate security strength.
-              </p>
-            )}
-          </article>
-        </section>
-
-        {generatedPassword ? (
-          <section className="generated-password-box">
-            <p className="eyebrow">Generated Password</p>
-            <code>{generatedPassword}</code>
-            <p className="hero-copy">
-              Copy this password. Make sure to keep it in a secure location.
-            </p>
-          </section>
-        ) : null}
-
-        <section className="panel history-panel">
-          <p className="eyebrow">Scan History</p>
-          <h3>Previous Password Scans</h3>
-          {scanHistory.length > 0 ? (
-            <div className="history-list">
-              {scanHistory.map((scan) => {
-                const dateStr = new Date(scan.created_at * 1000).toLocaleString()
-                return (
-                  <div key={scan.id} className="history-item" style={{ cursor: 'pointer' }} onClick={() => {
-                    setAnalyzerInput(scan.password_value);
-                    setAnalyzerResult({
-                      score: scan.score,
-                      grade: scan.grade,
-                      suggestions: getPasswordSuggestions(scan.password_value),
-                      feedback: []
-                    });
-                  }}>
-                    <div className="history-meta">
-                      <span className="history-text">•••••••••••• ({scan.password_length} chars)</span>
-                      <span className="history-date">{dateStr}</span>
-                    </div>
-                    <div className="history-stats">
-                      <span className={`status-pill status-${scan.grade.toLowerCase()}`}>{scan.grade} Risk</span>
-                      <span className="history-score">{scan.score}/100</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="hero-copy">No previous password scans found. Run a check above to see history.</p>
-          )}
-        </section>
-      </div>
     )
   }
 
@@ -1086,28 +602,18 @@ export default function App() {
             <p className="eyebrow">Security tools</p>
             <h2>URL Risk Analyzer</h2>
           </div>
-          <button type="button" className="primary-button" onClick={returnToDashboard}>
-            Back to dashboard
-          </button>
+          <button type="button" className="primary-button" onClick={returnToDashboard}>Back to dashboard</button>
         </header>
 
         <section className="hero-card">
           <div>
             <p className="eyebrow">Check URL Risks</p>
             <h3>Analyze links for phishing, brand spoofs, and redirection traps.</h3>
-            <p className="hero-copy">
-              Our machine learning classifier scans the address bar composition and page content to estimate risk scores.
-            </p>
+            <p className="hero-copy">Our machine learning classifier scans the address bar composition and page content to estimate risk scores.</p>
           </div>
           <div className="hero-panel">
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Parses IP usage, shortening services, and subdomains.</span>
-            </div>
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Queries DNS and inspects HTML resources if reachable.</span>
-            </div>
+            <div className="signal-row"><span className="signal-dot" /><span>Parses IP usage, shortening services, and subdomains.</span></div>
+            <div className="signal-row"><span className="signal-dot" /><span>Queries DNS and inspects HTML resources if reachable.</span></div>
           </div>
         </section>
 
@@ -1115,7 +621,7 @@ export default function App() {
           <article className="panel analyzer-form-card">
             <p className="eyebrow">URL Scanner</p>
             <h3>Submit a URL to analyze</h3>
-            
+
             <label className="field-label" htmlFor="url-input">Web Address / URL</label>
             <input
               id="url-input"
@@ -1148,10 +654,7 @@ export default function App() {
                     <strong className="score-value">{urlResult.risk_score}/100</strong>
                   </div>
                   <div className="score-meter">
-                    <span style={{ 
-                      width: `${urlResult.risk_score}%`,
-                      background: urlResult.risk_score >= 70 ? '#ef4444' : urlResult.risk_score >= 35 ? '#f59e0b' : '#22c55e'
-                    }} />
+                    <span style={{ width: `${urlResult.risk_score}%`, background: urlResult.risk_score >= 70 ? '#ef4444' : urlResult.risk_score >= 35 ? '#f59e0b' : '#22c55e' }} />
                   </div>
                 </div>
 
@@ -1162,12 +665,12 @@ export default function App() {
                   ))}
                 </ul>
 
-                {urlResult.scam_psychology && urlResult.scam_psychology.scores && Object.values(urlResult.scam_psychology.scores).some(v => v > 0) ? (
+                {urlResult.scam_psychology?.scores && Object.values(urlResult.scam_psychology.scores).some(v => v > 0) && (
                   <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
                     <p className="score-label">Spoofing & Scam Triggers in URL:</p>
                     {Object.entries(urlResult.scam_psychology.scores).map(([trigger, score]) => {
-                      if (score === 0) return null;
-                      const label = trigger.charAt(0).toUpperCase() + trigger.slice(1);
+                      if (score === 0) return null
+                      const label = trigger.charAt(0).toUpperCase() + trigger.slice(1)
                       return (
                         <div key={trigger} style={{ display: 'grid', gap: '4px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
@@ -1181,24 +684,24 @@ export default function App() {
                       )
                     })}
                   </div>
-                ) : null}
+                )}
 
-                {urlResult.features && Object.keys(urlResult.features).length > 0 ? (
+                {urlResult.features && Object.keys(urlResult.features).length > 0 && (
                   <>
                     <p className="score-label" style={{ marginTop: '10px' }}>Extracted Feature Flags (30 metrics):</p>
                     <div className="features-grid">
                       {Object.entries(urlResult.features).map(([name, val]) => {
-                        const statusClass = val === -1 ? 'threat' : val === 0 ? 'suspicious' : 'safe';
+                        const statusClass = val === -1 ? 'threat' : val === 0 ? 'suspicious' : 'safe'
                         return (
                           <div key={name} className={`feature-badge ${statusClass}`} title={`${name}: ${val}`}>
                             <span className={`feature-indicator ${statusClass}`} />
                             <span>{name.replace(/_/g, ' ')}</span>
                           </div>
-                        );
+                        )
                       })}
                     </div>
                   </>
-                ) : null}
+                )}
               </>
             ) : (
               <p className="hero-copy">Enter a web link and click Scan URL to display results.</p>
@@ -1215,14 +718,14 @@ export default function App() {
                 const dateStr = new Date(scan.created_at * 1000).toLocaleString()
                 return (
                   <div key={scan.id} className="history-item" style={{ cursor: 'pointer' }} onClick={() => {
-                    setUrlInput(scan.url);
+                    setUrlInput(scan.url)
                     setUrlResult({
                       prediction: scan.prediction,
                       risk_score: scan.risk_score,
-                      feedback: [scan.scam_explanations || "Loaded from scan history."],
+                      feedback: [scan.scam_explanations || 'Loaded from scan history.'],
                       features: scan.features || {},
                       scam_psychology: scan.scam_psychology || {}
-                    });
+                    })
                   }}>
                     <div className="history-meta">
                       <span className="history-text" title={scan.url}>{scan.url}</span>
@@ -1252,28 +755,18 @@ export default function App() {
             <p className="eyebrow">Security tools</p>
             <h2>Message Analyzer</h2>
           </div>
-          <button type="button" className="primary-button" onClick={returnToDashboard}>
-            Back to dashboard
-          </button>
+          <button type="button" className="primary-button" onClick={returnToDashboard}>Back to dashboard</button>
         </header>
 
         <section className="hero-card">
           <div>
             <p className="eyebrow">SMS & Mail Scan</p>
             <h3>Verify message copy for phishing triggers, urgent baits, and scam intent.</h3>
-            <p className="hero-copy">
-              Our explainable model checks SMS, email copy, and verification alerts to locate dangerous social engineering hooks.
-            </p>
+            <p className="hero-copy">Our explainable model checks SMS, email copy, and verification alerts to locate dangerous social engineering hooks.</p>
           </div>
           <div className="hero-panel">
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Flags request structure cues, credential verification, and spoof links.</span>
-            </div>
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Translates underlying scam psychology indicators.</span>
-            </div>
+            <div className="signal-row"><span className="signal-dot" /><span>Flags request structure cues, credential verification, and spoof links.</span></div>
+            <div className="signal-row"><span className="signal-dot" /><span>Translates underlying scam psychology indicators.</span></div>
           </div>
         </section>
 
@@ -1281,7 +774,7 @@ export default function App() {
           <article className="panel analyzer-form-card">
             <p className="eyebrow">Message Body</p>
             <h3>Analyze text patterns</h3>
-            
+
             <label className="field-label" htmlFor="message-input">Message Copy</label>
             <textarea
               id="message-input"
@@ -1314,10 +807,7 @@ export default function App() {
                     <strong className="score-value">{messageResult.risk_score}/100</strong>
                   </div>
                   <div className="score-meter">
-                    <span style={{ 
-                      width: `${messageResult.risk_score}%`,
-                      background: messageResult.risk_score >= 70 ? '#ef4444' : messageResult.risk_score >= 35 ? '#f59e0b' : '#22c55e'
-                    }} />
+                    <span style={{ width: `${messageResult.risk_score}%`, background: messageResult.risk_score >= 70 ? '#ef4444' : messageResult.risk_score >= 35 ? '#f59e0b' : '#22c55e' }} />
                   </div>
                 </div>
 
@@ -1328,12 +818,12 @@ export default function App() {
                   ))}
                 </ul>
 
-                {messageResult.scam_psychology && messageResult.scam_psychology.scores && Object.values(messageResult.scam_psychology.scores).some(v => v > 0) ? (
+                {messageResult.scam_psychology?.scores && Object.values(messageResult.scam_psychology.scores).some(v => v > 0) && (
                   <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
                     <p className="score-label">Social Engineering triggers:</p>
                     {Object.entries(messageResult.scam_psychology.scores).map(([trigger, score]) => {
-                      if (score === 0) return null;
-                      const label = trigger.charAt(0).toUpperCase() + trigger.slice(1);
+                      if (score === 0) return null
+                      const label = trigger.charAt(0).toUpperCase() + trigger.slice(1)
                       return (
                         <div key={trigger} style={{ display: 'grid', gap: '4px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
@@ -1347,7 +837,7 @@ export default function App() {
                       )
                     })}
                   </div>
-                ) : null}
+                )}
               </>
             ) : (
               <p className="hero-copy">Enter text copy and click Analyze Message to display results.</p>
@@ -1364,13 +854,13 @@ export default function App() {
                 const dateStr = new Date(scan.created_at * 1000).toLocaleString()
                 return (
                   <div key={scan.id} className="history-item" style={{ cursor: 'pointer' }} onClick={() => {
-                    setMessageInput(scan.message);
+                    setMessageInput(scan.message)
                     setMessageResult({
                       prediction: scan.prediction,
                       risk_score: scan.risk_score,
-                      feedback: [scan.scam_explanations || "Loaded from history log."],
+                      feedback: [scan.scam_explanations || 'Loaded from history log.'],
                       scam_psychology: scan.scam_psychology || {}
-                    });
+                    })
                   }}>
                     <div className="history-meta">
                       <span className="history-text" title={scan.message}>{scan.message}</span>
@@ -1400,28 +890,18 @@ export default function App() {
             <p className="eyebrow">Security tools</p>
             <h2>AI Deepfake Image & Video Identifier</h2>
           </div>
-          <button type="button" className="primary-button" onClick={returnToDashboard}>
-            Back to dashboard
-          </button>
+          <button type="button" className="primary-button" onClick={returnToDashboard}>Back to dashboard</button>
         </header>
 
         <section className="hero-card">
           <div>
             <p className="eyebrow">Media Authenticity Check</p>
             <h3>Identify synthetic images and video manipulations.</h3>
-            <p className="hero-copy">
-              Our explainable checker inspects binary metadata signatures and performs visual-temporal consistency checks to identify GAN/Diffusion generations and face swaps.
-            </p>
+            <p className="hero-copy">Our explainable checker inspects binary metadata signatures and performs visual-temporal consistency checks to identify GAN/Diffusion generations and face swaps.</p>
           </div>
           <div className="hero-panel">
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Detects embedded AI tool headers (Midjourney, DALL-E, etc.).</span>
-            </div>
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Validates camera EXIF structures and temporal frame rate continuity.</span>
-            </div>
+            <div className="signal-row"><span className="signal-dot" /><span>Detects embedded AI tool headers (Midjourney, DALL-E, etc.).</span></div>
+            <div className="signal-row"><span className="signal-dot" /><span>Validates camera EXIF structures and temporal frame rate continuity.</span></div>
           </div>
         </section>
 
@@ -1430,29 +910,11 @@ export default function App() {
             <p className="eyebrow">Media Uploader</p>
             <h3>Select Image or Video file</h3>
 
-            <div 
+            <div
               className="dropzone-container"
-              style={{
-                border: '2px dashed #334155',
-                borderRadius: '12px',
-                padding: '24px',
-                textAlign: 'center',
-                background: '#0f172a',
-                cursor: 'pointer',
-                position: 'relative',
-                overflow: 'hidden',
-                minHeight: '200px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}
+              style={{ border: '2px dashed #334155', borderRadius: '12px', padding: '24px', textAlign: 'center', background: '#0f172a', cursor: 'pointer', position: 'relative', overflow: 'hidden', minHeight: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) handleDeepfakeFileChange(file);
-              }}
+              onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file) handleDeepfakeFileChange(file) }}
               onClick={() => document.getElementById('deepfake-file-input').click()}
             >
               <input
@@ -1460,12 +922,9 @@ export default function App() {
                 type="file"
                 accept="image/*,video/*"
                 style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDeepfakeFileChange(file);
-                }}
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) handleDeepfakeFileChange(file) }}
               />
-              
+
               {deepfakePreviewUrl ? (
                 <div style={{ position: 'relative', width: '100%', maxWidth: '280px', maxHeight: '200px', overflow: 'hidden', borderRadius: '8px' }}>
                   {deepfakeFile.type.includes('video') ? (
@@ -1474,19 +933,7 @@ export default function App() {
                     <img src={deepfakePreviewUrl} alt="Preview" style={{ width: '100%', height: 'auto', borderRadius: '8px' }} />
                   )}
                   {isScanningDeepfake && (
-                    <div 
-                      className="scan-beam"
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '4px',
-                        background: 'linear-gradient(90deg, transparent, #ef4444, transparent)',
-                        boxShadow: '0 0 8px #ef4444',
-                        animation: 'scanMotion 1.5s infinite ease-in-out'
-                      }}
-                    />
+                    <div className="scan-beam" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: 'linear-gradient(90deg, transparent, #ef4444, transparent)', boxShadow: '0 0 8px #ef4444', animation: 'scanMotion 1.5s infinite ease-in-out' }} />
                   )}
                 </div>
               ) : (
@@ -1502,37 +949,23 @@ export default function App() {
 
             {deepfakeFile && (
               <div style={{ fontSize: '0.8rem', color: '#94a3b8', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
-                <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                  <strong>Name:</strong> {deepfakeFile.name}
-                </div>
+                <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}><strong>Name:</strong> {deepfakeFile.name}</div>
                 <div><strong>Size:</strong> {(deepfakeFile.size / 1024 / 1024).toFixed(2)} MB</div>
                 <div><strong>Format:</strong> {deepfakeFile.type || 'unknown'}</div>
               </div>
             )}
 
             <div className="auth-actions">
-              <button 
-                type="button" 
-                className="primary-button" 
-                onClick={runDeepfakeAnalyzer} 
-                disabled={!deepfakeFile || isScanningDeepfake}
-                style={{ flex: 1 }}
-              >
+              <button type="button" className="primary-button" onClick={runDeepfakeAnalyzer} disabled={!deepfakeFile || isScanningDeepfake} style={{ flex: 1 }}>
                 {isScanningDeepfake ? <span className="loading-spinner" /> : 'Analyze Media'}
               </button>
               {deepfakeFile && (
-                <button 
-                  type="button" 
-                  className="secondary-button" 
-                  onClick={() => {
-                    setDeepfakeFile(null);
-                    setDeepfakeResult(null);
-                    if (deepfakePreviewUrl) {
-                      URL.revokeObjectURL(deepfakePreviewUrl);
-                    }
-                    setDeepfakePreviewUrl(null);
-                  }}
-                >
+                <button type="button" className="secondary-button" onClick={() => {
+                  setDeepfakeFile(null)
+                  setDeepfakeResult(null)
+                  if (deepfakePreviewUrl) URL.revokeObjectURL(deepfakePreviewUrl)
+                  setDeepfakePreviewUrl(null)
+                }}>
                   Clear File
                 </button>
               )}
@@ -1551,10 +984,7 @@ export default function App() {
                     <strong className="score-value">{deepfakeResult.risk_score}%</strong>
                   </div>
                   <div className="score-meter">
-                    <span style={{ 
-                      width: `${deepfakeResult.risk_score}%`,
-                      background: deepfakeResult.risk_score >= 60 ? '#ef4444' : deepfakeResult.risk_score >= 30 ? '#f59e0b' : '#22c55e'
-                    }} />
+                    <span style={{ width: `${deepfakeResult.risk_score}%`, background: deepfakeResult.risk_score >= 60 ? '#ef4444' : deepfakeResult.risk_score >= 30 ? '#f59e0b' : '#22c55e' }} />
                   </div>
                 </div>
 
@@ -1565,7 +995,7 @@ export default function App() {
                   ))}
                 </ul>
 
-                {deepfakeResult.features && Object.keys(deepfakeResult.features).length > 0 ? (
+                {deepfakeResult.features && Object.keys(deepfakeResult.features).length > 0 && (
                   <div style={{ marginTop: '14px', display: 'grid', gap: '8px' }}>
                     <p className="score-label">Anomalies Breakdown:</p>
                     {Object.entries(deepfakeResult.features).map(([metric, score]) => (
@@ -1575,15 +1005,12 @@ export default function App() {
                           <strong style={{ color: score >= 60 ? '#f87171' : score >= 30 ? '#fbbf24' : '#34d399' }}>{score}%</strong>
                         </div>
                         <div className="score-meter" style={{ height: '6px' }}>
-                          <span style={{ 
-                            width: `${score}%`, 
-                            background: score >= 60 ? '#ef4444' : score >= 30 ? '#f59e0b' : '#10b981' 
-                          }} />
+                          <span style={{ width: `${score}%`, background: score >= 60 ? '#ef4444' : score >= 30 ? '#f59e0b' : '#10b981' }} />
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : null}
+                )}
 
                 <div style={{ marginTop: '16px', background: '#0f172a', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
                   <p className="score-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', marginBottom: '6px' }}>
@@ -1621,28 +1048,24 @@ export default function App() {
                 const dateStr = new Date(scan.created_at * 1000).toLocaleString()
                 return (
                   <div key={scan.id} className="history-item" style={{ cursor: 'pointer' }} onClick={() => {
-                    setDeepfakeFile({ name: scan.file_name, size: 0, type: scan.file_type === 'video' ? 'video/mp4' : 'image/jpeg' });
-                    setDeepfakePreviewUrl(null);
+                    setDeepfakeFile({ name: scan.file_name, size: 0, type: scan.file_type === 'video' ? 'video/mp4' : 'image/jpeg' })
+                    setDeepfakePreviewUrl(null)
                     setDeepfakeResult({
                       file_name: scan.file_name,
                       file_type: scan.file_type,
                       prediction: scan.prediction,
                       risk_score: scan.risk_score,
                       features: scan.features || {},
-                      feedback: ["Loaded from deepfake scan logs history."],
+                      feedback: ['Loaded from deepfake scan logs history.'],
                       metadata: { file_size_bytes: 0 }
-                    });
+                    })
                   }}>
                     <div className="history-meta">
-                      <span className="history-text" title={scan.file_name}>
-                        {scan.file_type === 'video' ? '🎥' : '🖼️'} {scan.file_name}
-                      </span>
+                      <span className="history-text" title={scan.file_name}>{scan.file_type === 'video' ? '🎥' : '🖼️'} {scan.file_name}</span>
                       <span className="history-date">{dateStr}</span>
                     </div>
                     <div className="history-stats">
-                      <span className={`status-pill status-${scan.prediction.toLowerCase().replace(' ', '-')}`}>
-                        {scan.prediction}
-                      </span>
+                      <span className={`status-pill status-${scan.prediction.toLowerCase().replace(' ', '-')}`}>{scan.prediction}</span>
                       <span className="history-score">{scan.risk_score}% Risk</span>
                     </div>
                   </div>
@@ -1665,28 +1088,18 @@ export default function App() {
             <p className="eyebrow">Crowdsourced Threat Intel</p>
             <h2>CrowdShield Feed & Registry</h2>
           </div>
-          <button type="button" className="primary-button" onClick={returnToDashboard}>
-            Back to dashboard
-          </button>
+          <button type="button" className="primary-button" onClick={returnToDashboard}>Back to dashboard</button>
         </header>
 
         <section className="hero-card">
           <div>
             <p className="eyebrow">Defending Together</p>
             <h3>Report scams, blacklist phishing links, and upvote verification alerts.</h3>
-            <p className="hero-copy">
-              CrowdShield is our shared reputation repository. Reported indicators instantly trigger automated 100/100 score blocklist alerts across our URL and Message scanners.
-            </p>
+            <p className="hero-copy">CrowdShield is our shared reputation repository. Reported indicators instantly trigger automated 100/100 score blocklist alerts across our URL and Message scanners.</p>
           </div>
           <div className="hero-panel">
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Submit suspicious text structures or domain links below.</span>
-            </div>
-            <div className="signal-row">
-              <span className="signal-dot" />
-              <span>Promote pending threat items to verified blocklists.</span>
-            </div>
+            <div className="signal-row"><span className="signal-dot" /><span>Submit suspicious text structures or domain links below.</span></div>
+            <div className="signal-row"><span className="signal-dot" /><span>Promote pending threat items to verified blocklists.</span></div>
           </div>
         </section>
 
@@ -1694,25 +1107,12 @@ export default function App() {
           <article className="panel analyzer-form-card">
             <p className="eyebrow">Report Threat</p>
             <h3>Share malicious indicator</h3>
-            
+
             <form onSubmit={submitCommunityReport} style={{ display: 'grid', gap: '14px' }}>
               <div>
                 <label className="field-label" htmlFor="report-type">Threat Type</label>
-                <select
-                  id="report-type"
-                  value={reportType}
-                  onChange={(e) => setReportType(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: '#1e293b',
-                    border: '1px solid #334155',
-                    color: '#cbd5e1',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                >
+                <select id="report-type" value={reportType} onChange={(e) => setReportType(e.target.value)}
+                  style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', padding: '10px', borderRadius: '8px', outline: 'none', fontSize: '0.9rem' }}>
                   <option value="url">Malicious URL / Link</option>
                   <option value="message">SMS / Email Message Text</option>
                 </select>
@@ -1721,36 +1121,15 @@ export default function App() {
               <div>
                 <label className="field-label" htmlFor="report-value">Suspicious Value</label>
                 {reportType === 'url' ? (
-                  <input
-                    id="report-value"
-                    type="text"
-                    className="password-input"
-                    value={reportValue}
-                    onChange={(e) => setReportValue(e.target.value)}
-                    placeholder="e.g. http://login-paypal-security-verification.com"
-                  />
+                  <input id="report-value" type="text" className="password-input" value={reportValue} onChange={(e) => setReportValue(e.target.value)} placeholder="e.g. http://login-paypal-security-verification.com" />
                 ) : (
-                  <textarea
-                    id="report-value"
-                    className="analyzer-textarea"
-                    value={reportValue}
-                    onChange={(e) => setReportValue(e.target.value)}
-                    placeholder="Paste suspicious text message body..."
-                    rows={4}
-                  />
+                  <textarea id="report-value" className="analyzer-textarea" value={reportValue} onChange={(e) => setReportValue(e.target.value)} placeholder="Paste suspicious text message body..." rows={4} />
                 )}
               </div>
 
               <div>
                 <label className="field-label" htmlFor="report-desc">Description / Notes</label>
-                <input
-                  id="report-desc"
-                  type="text"
-                  className="password-input"
-                  value={reportDescription}
-                  onChange={(e) => setReportDescription(e.target.value)}
-                  placeholder="e.g. Netflix login spoof spoofing customer billing details"
-                />
+                <input id="report-desc" type="text" className="password-input" value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} placeholder="e.g. Netflix login spoof spoofing customer billing details" />
               </div>
 
               <button type="submit" className="primary-button" style={{ width: '100%' }} disabled={isReporting}>
@@ -1762,7 +1141,7 @@ export default function App() {
           <article className="panel analyzer-form-card">
             <p className="eyebrow">Reputation Lookup</p>
             <h3>Lookup indicator status</h3>
-            
+
             <div style={{ display: 'grid', gap: '14px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
@@ -1773,32 +1152,25 @@ export default function App() {
                   placeholder="Enter URL or message snippet to verify..."
                   style={{ flex: 1 }}
                 />
-                <button type="button" className="primary-button" onClick={runCommunityLookup} disabled={isCommunityLookingUp}>
-                  Check Reputation
-                </button>
+                <button type="button" className="primary-button" onClick={runCommunityLookup} disabled={isCommunityLookingUp}>Check Reputation</button>
               </div>
 
-              {communityLookupResult ? (
+              {communityLookupResult && (
                 <div style={{
-                  padding: '14px',
-                  borderRadius: '8px',
+                  padding: '14px', borderRadius: '8px',
                   background: communityLookupResult.status === 'verified_threat' ? '#451a03' : communityLookupResult.status === 'pending' ? '#3b2203' : '#064e3b',
                   border: '1px solid ' + (communityLookupResult.status === 'verified_threat' ? '#ea580c' : communityLookupResult.status === 'pending' ? '#d97706' : '#059669')
                 }}>
                   <strong style={{ display: 'block', fontSize: '0.95rem', color: '#f8fafc' }}>
-                    {communityLookupResult.status === 'verified_threat' 
-                      ? '🚫 BLOCKED THREAT' 
-                      : communityLookupResult.status === 'pending' 
-                        ? '⚠️ SUSPICIOUS (Pending Verification)' 
-                        : '✅ NO ACTIVE BLOCKLIST MATCH'}
+                    {communityLookupResult.status === 'verified_threat' ? '🚫 BLOCKED THREAT' : communityLookupResult.status === 'pending' ? '⚠️ SUSPICIOUS (Pending Verification)' : '✅ NO ACTIVE BLOCKLIST MATCH'}
                   </strong>
                   <span style={{ fontSize: '0.85rem', color: '#cbd5e1', display: 'block', marginTop: '4px' }}>
-                    {communityLookupResult.status === 'clean' 
+                    {communityLookupResult.status === 'clean'
                       ? 'No match in community blocklist feed. Run standard scan to analyze.'
                       : `Description: ${communityLookupResult.description || 'No comments'} | Reports: ${communityLookupResult.reports_count}`}
                   </span>
                 </div>
-              ) : null}
+              )}
             </div>
           </article>
         </section>
@@ -1806,7 +1178,7 @@ export default function App() {
         <section className="panel history-panel" style={{ marginTop: '24px' }}>
           <p className="eyebrow">Live Feed</p>
           <h3>Recent Blocklist Submissions</h3>
-          
+
           {communityReports.length > 0 ? (
             <div style={{ overflowX: 'auto', marginTop: '10px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
@@ -1824,14 +1196,9 @@ export default function App() {
                   {communityReports.map((report) => (
                     <tr key={report.id} style={{ borderBottom: '1px solid #1e293b', color: '#cbd5e1' }}>
                       <td style={{ padding: '10px', textTransform: 'uppercase' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          background: report.indicator_type === 'url' ? '#1e1b4b' : '#311042',
-                          color: report.indicator_type === 'url' ? '#818cf8' : '#e879f9',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>{report.indicator_type}</span>
+                        <span style={{ padding: '3px 8px', borderRadius: '4px', background: report.indicator_type === 'url' ? '#1e1b4b' : '#311042', color: report.indicator_type === 'url' ? '#818cf8' : '#e879f9', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                          {report.indicator_type}
+                        </span>
                       </td>
                       <td style={{ padding: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }} title={report.indicator_value}>
                         <code>{report.indicator_value}</code>
@@ -1845,20 +1212,8 @@ export default function App() {
                       </td>
                       <td style={{ padding: '10px', textAlign: 'right' }}>
                         {report.status === 'pending' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleVerifyReport(report.id)}
-                            style={{
-                              padding: '4px 10px',
-                              background: '#ea580c',
-                              border: 'none',
-                              color: '#fff',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold'
-                            }}
-                          >
+                          <button type="button" onClick={() => handleVerifyReport(report.id)}
+                            style={{ padding: '4px 10px', background: '#ea580c', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
                             Verify Phish
                           </button>
                         ) : (
@@ -1878,17 +1233,11 @@ export default function App() {
     )
   }
 
+  // ── Auth page ─────────────────────────────────────────────────────────────
+
   const authCopy = authTab === 'signup'
-    ? {
-        eyebrow: 'Create profile',
-        title: 'Join CyberGuardian AI',
-        copy: 'Create your profile, then verify with OTP or Google to unlock the dashboard.',
-      }
-    : {
-        eyebrow: 'Sign in',
-        title: 'Welcome back',
-        copy: 'Enter your email or phone number and we will send a one-time code.',
-      }
+    ? { eyebrow: 'Create profile', title: 'Join CyberGuardian AI', copy: 'Create your profile, then verify with OTP or Google to unlock the dashboard.' }
+    : { eyebrow: 'Sign in', title: 'Welcome back', copy: 'Enter your email or phone number and we will send a one-time code.' }
 
   if (!isAuthenticated && !showGuestShell) {
     return (
@@ -1901,36 +1250,21 @@ export default function App() {
               <span className="auth-brand-name">CyberGuardian AI</span>
             </div>
             <h1>Sign in to unlock your security dashboard.</h1>
-            <p>
-              Use Google, email, phone number, or register a profile. The protected experience stays locked until you authenticate.
-            </p>
+            <p>Use Google, email, phone number, or register a profile. The protected experience stays locked until you authenticate.</p>
           </div>
 
           <div className="auth-hero-cards">
-            <article>
-              <strong>Protected scans</strong>
-              <span>Unlock password analysis, risk scoring, and future threat tools.</span>
-            </article>
-            <article>
-              <strong>Explainable results</strong>
-              <span>See the reason behind every alert and recommendation.</span>
-            </article>
-            <article>
-              <strong>Private sessions</strong>
-              <span>Access stays gated until you complete sign-in or registration.</span>
-            </article>
+            <article><strong>Protected scans</strong><span>Unlock password analysis, risk scoring, and future threat tools.</span></article>
+            <article><strong>Explainable results</strong><span>See the reason behind every alert and recommendation.</span></article>
+            <article><strong>Private sessions</strong><span>Access stays gated until you complete sign-in or registration.</span></article>
           </div>
         </section>
 
         <section className="auth-panel-shell">
           <div className="auth-panel-card">
             <div className="auth-tab-row" role="tablist" aria-label="Authentication tabs">
-              <button type="button" className={`auth-tab ${authTab === 'login' ? 'active' : ''}`} onClick={switchToLogin}>
-                Login
-              </button>
-              <button type="button" className={`auth-tab ${authTab === 'signup' ? 'active' : ''}`} onClick={switchToSignup}>
-                Sign up
-              </button>
+              <button type="button" className={`auth-tab ${authTab === 'login' ? 'active' : ''}`} onClick={switchToLogin}>Login</button>
+              <button type="button" className={`auth-tab ${authTab === 'signup' ? 'active' : ''}`} onClick={switchToSignup}>Sign up</button>
             </div>
 
             <div className="auth-panel-header">
@@ -1944,26 +1278,16 @@ export default function App() {
             <div id="google-signin-btn" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}></div>
 
             <form className="auth-form" onSubmit={handleAuthSubmit}>
-              {authTab === 'signup' ? (
+              {authTab === 'signup' && (
                 <label className="auth-field">
                   Your name
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    placeholder="Full name as shown on your profile"
-                    autoComplete="name"
-                  />
+                  <input type="text" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Full name as shown on your profile" autoComplete="name" />
                 </label>
-              ) : null}
+              )}
 
               <div className="auth-contact-switch" role="tablist" aria-label="Contact method">
-                <button type="button" className={`auth-mini-switch ${contactMode === 'email' ? 'active' : ''}`} onClick={() => handleContactModeChange('email')}>
-                  Email
-                </button>
-                <button type="button" className={`auth-mini-switch ${contactMode === 'phone' ? 'active' : ''}`} onClick={() => handleContactModeChange('phone')}>
-                  Phone
-                </button>
+                <button type="button" className={`auth-mini-switch ${contactMode === 'email' ? 'active' : ''}`} onClick={() => handleContactModeChange('email')}>Email</button>
+                <button type="button" className={`auth-mini-switch ${contactMode === 'phone' ? 'active' : ''}`} onClick={() => handleContactModeChange('phone')}>Phone</button>
               </div>
 
               <label className="auth-field">
@@ -1977,38 +1301,24 @@ export default function App() {
                 />
               </label>
 
-              {otpSent ? (
+              {otpSent && (
                 <label className="auth-field">
                   OTP
-                  <input
-                    type="text"
-                    value={otpValue}
-                    onChange={(event) => setOtpValue(event.target.value)}
-                    placeholder="Enter the one-time code"
-                    inputMode="numeric"
-                  />
+                  <input type="text" value={otpValue} onChange={(event) => setOtpValue(event.target.value)} placeholder="Enter the one-time code" inputMode="numeric" />
                 </label>
-              ) : null}
+              )}
 
               <div className="auth-actions-row">
-                <button type="submit" className="primary-button auth-submit-button">
-                  {otpSent ? 'Verify OTP' : 'Send OTP'}
-                </button>
-                <button type="button" className="ghost-button" onClick={handleContinueAsGuest}>
-                  Skip for now
-                </button>
+                <button type="submit" className="primary-button auth-submit-button">{otpSent ? 'Verify OTP' : 'Send OTP'}</button>
+                <button type="button" className="ghost-button" onClick={handleContinueAsGuest}>Skip for now</button>
               </div>
 
               <div className="auth-footer-links">
-                <button type="button" className="link-button" onClick={switchToLogin}>
-                  Login
-                </button>
-                <button type="button" className="link-button" onClick={switchToSignup}>
-                  Sign up
-                </button>
+                <button type="button" className="link-button" onClick={switchToLogin}>Login</button>
+                <button type="button" className="link-button" onClick={switchToSignup}>Sign up</button>
               </div>
 
-              {authMessage ? <p className="auth-modal-message">{authMessage}</p> : null}
+              {authMessage && <p className="auth-modal-message">{authMessage}</p>}
             </form>
           </div>
         </section>
@@ -2020,9 +1330,7 @@ export default function App() {
     return (
       <div className="app-shell app-shell--topnav">
         {renderTopNavbar(true)}
-        <main className="main-content">
-          {renderDashboardView()}
-        </main>
+        <main className="main-content">{renderDashboardView()}</main>
       </div>
     )
   }
@@ -2032,7 +1340,13 @@ export default function App() {
       {renderTopNavbar(false)}
       <main className="main-content">
         {activePage === 'dashboard' && renderDashboardView()}
-        {activePage === 'password-analyzer' && renderPasswordAnalyzerView()}
+        {activePage === 'password-analyzer' && (
+          <PasswordAnalyzer
+            onReturn={returnToDashboard}
+            onFetchHistory={fetchHistories}
+            scanHistory={scanHistory}
+          />
+        )}
         {activePage === 'url-analyzer' && renderUrlAnalyzerView()}
         {activePage === 'message-analyzer' && renderMessageAnalyzerView()}
         {activePage === 'deepfake-analyzer' && renderDeepfakeAnalyzerView()}

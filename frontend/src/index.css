@@ -1065,4 +1065,38 @@ input:disabled {
 	}
 }
 
+/* New UI Styles */
 
+.button-base {
+    border: 0;
+    border-radius: 14px;
+    padding: 12px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.button-primary {
+    background: #3b82f6;
+    color: #eff6ff;
+}
+
+.button-primary:hover {
+    background: #2563eb;
+}
+
+.button-secondary {
+    background: rgba(148, 163, 184, 0.12);
+    color: #e2e8f0;
+}
+
+.button-secondary:hover {
+    background: rgba(148, 163, 184, 0.2);
+}
+
+.card {
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(26, 35, 50, 0.9);
+    border-radius: 24px;
+    padding: 24px;
+}

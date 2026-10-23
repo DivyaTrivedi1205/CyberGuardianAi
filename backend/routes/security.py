@@ -6,6 +6,7 @@ import hashlib
 import pickle
 from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File
+from jose import JWTError, jwt
 from psycopg2.extras import RealDictCursor
 from database.connection import db_connection, now_ts
 from database.scan_repository import (
@@ -129,19 +130,15 @@ def get_url_model():
 def get_optional_user(
     authorization: Optional[str] = Header(default=None),
 ) -> Optional[UserOut]:
+    if not authorization:
+        return None
     token = token_from_authorization(authorization)
-    if token is None:
+    if not token:
         return None
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-        with db_connection() as connection:
-            user_row = get_user_by_id(connection, user_id)
-        if user_row is None:
-            return None
-        return build_user_out(user_row)
+        return get_current_user(authorization)
+    except HTTPException:
+        return None
     except Exception:
         return None
 

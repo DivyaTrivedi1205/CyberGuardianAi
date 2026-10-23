@@ -1,0 +1,11 @@
+{
+    "total_videos_processed": 6000,
+    "decoding_time_seconds": 2665.1665875911713,
+    "requested_frames": 30000,
+    "successfully_extracted_frames": 30000,
+    "videos_complete_success": 6000,
+    "videos_partial_success": 0,
+    "videos_zero_success": 0,
+    "already_cached_videos": 661,
+    "new_bytes_written_mb": 359.87567138671875
+}

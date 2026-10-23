@@ -1,0 +1,16 @@
+{
+    "benchmark_sample_size": 30,
+    "decoding_time_seconds": 18.01,
+    "time_per_video_seconds": 0.6,
+    "requested_frames": 150,
+    "successfully_extracted_frames": 150,
+    "videos_complete_success": 30,
+    "videos_partial_success": 0,
+    "videos_zero_success": 0,
+    "average_cache_size_per_video_bytes": 73697.87,
+    "projected_disk_size_6000_videos_mb": 421.7,
+    "projected_total_time_hours": 1.0,
+    "preprocessing_fidelity": "Verified identical RGB pipeline via OpenCVDNNFaceExtractor + PIL exactly identical to dataloader.",
+    "windows_dependency_issues": "None observed; OpenCV reads ran natively via single thread decoding.",
+    "recommendation": "Proceed safely. Disk requirement maps tightly under 1 GB total. Estimated pre-cache build time spans ~1.3 hours asynchronously, resolving internal PyTorch DataLoader timeout crashes."
+}

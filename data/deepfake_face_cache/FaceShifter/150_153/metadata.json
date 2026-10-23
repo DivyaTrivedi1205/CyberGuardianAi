@@ -1,0 +1,56 @@
+{
+    "source_path": "FaceShifter/150_153.mp4",
+    "label": "FAKE",
+    "split": "train",
+    "manipulation": "FaceShifter",
+    "fractions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+    ],
+    "target_size": [
+        224,
+        224
+    ],
+    "prep_version": "1.0",
+    "extracted_count": 5,
+    "frames": [
+        {
+            "fraction": 0.1,
+            "file": "frame_10_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 11788
+        },
+        {
+            "fraction": 0.3,
+            "file": "frame_30_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 11969
+        },
+        {
+            "fraction": 0.5,
+            "file": "frame_50_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 11826
+        },
+        {
+            "fraction": 0.7,
+            "file": "frame_70_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 11981
+        },
+        {
+            "fraction": 0.9,
+            "file": "frame_90_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 11878
+        }
+    ]
+}

@@ -130,10 +130,10 @@ export default function App() {
     if (!storedToken) return
     try {
       const [passHist, urlHist, msgHist, dfHist] = await Promise.all([
-        apiRequest('/security/password-scans').catch(() => []),
-        apiRequest('/security/url-scans').catch(() => []),
-        apiRequest('/security/message-scans').catch(() => []),
-        apiRequest('/security/deepfake-scans').catch(() => [])
+        apiRequest('/security/password-scans').catch((e) => { console.error('passHist error:', e); return []; }),
+        apiRequest('/security/url-scans').catch((e) => { console.error('urlHist error:', e); return []; }),
+        apiRequest('/security/message-scans').catch((e) => { console.error('msgHist error:', e); return []; }),
+        apiRequest('/security/deepfake-scans').catch((e) => { console.error('dfHist error:', e); return []; })
       ])
       setScanHistory(passHist)
       setUrlScanHistory(urlHist)
@@ -146,6 +146,15 @@ export default function App() {
 
   useEffect(() => {
     fetchCommunityReports()
+  }, [])
+
+  useEffect(() => {
+    if (activePage === 'dashboard' && isAuthenticated) {
+      fetchHistories();
+    }
+  }, [activePage, isAuthenticated]);
+
+  useEffect(() => {
     const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY)
     const storedUser = window.localStorage.getItem(AUTH_USER_KEY)
 

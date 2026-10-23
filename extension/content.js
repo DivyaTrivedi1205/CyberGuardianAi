@@ -73,26 +73,27 @@ function shouldSkipUrl(url) {
   }
 }
 
-// Analyze URL silently (no user interaction)
-async function analyzeUrlQuietly(url) {
-  try {
-    const response = await fetch(`${backendUrl}/security/analyze-url`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
+// Analyze URL silently via background service worker (bypasses webpage CORS restrictions)
+function analyzeUrlQuietly(url) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { action: 'analyzeUrl', url, backendUrl },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        if (!response || !response.success) {
+          return reject(new Error(response?.error || 'Analysis failed'));
+        }
+        resolve(response.data);
+      }
+    );
+  });
 }
 
 // Decorate link based on risk
 function decorateLink(linkElement, result) {
-  if (!result || !result.risk_score) return;
+  if (!result || typeof result.risk_score !== 'number') return;
 
   const score = result.risk_score;
   const prediction = result.prediction || 'Unknown';
@@ -101,16 +102,11 @@ function decorateLink(linkElement, result) {
   linkElement.dataset.cgRisk = score;
   linkElement.dataset.cgPrediction = prediction;
 
-  // Don't visually block - just add subtle indicator
+  // Don't visually block - add subtle indicator
   if (score >= 70) {
-    // High risk - add warning tooltip
+    // High risk - add warning tooltip and red dotted underline
     linkElement.title = `⚠️ CyberGuardian: ${prediction} (Risk: ${score}/100)`;
     linkElement.style.borderBottom = '2px dotted #ef4444';
-    linkElement.addEventListener('click', (e) => {
-      if (!confirm(`CyberGuardian Warning: This link appears to be ${prediction} (Risk: ${score}/100). Continue anyway?`)) {
-        e.preventDefault();
-      }
-    });
   } else if (score >= 35) {
     // Moderate risk - subtle indicator
     linkElement.title = `⚠️ CyberGuardian: ${prediction} (Risk: ${score}/100)`;
@@ -119,10 +115,14 @@ function decorateLink(linkElement, result) {
   // Low risk - no visual change
 }
 
-// Check page on load
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(checkPageLinks, 500); // Wait for page to render
-});
+// Check page on load (robust against document.readyState)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(checkPageLinks, 500);
+  });
+} else {
+  setTimeout(checkPageLinks, 500);
+}
 
 // Re-check when new content is added (AJAX)
 const observer = new MutationObserver((mutations) => {
@@ -145,13 +145,15 @@ observer.observe(document.body, {
 
 // Intercept link clicks to warn about suspicious URLs
 document.addEventListener('click', (e) => {
-  if (e.target.tagName === 'A' && e.target.href) {
-    const url = e.target.href;
-    const risk = e.target.dataset.cgRisk;
+  const link = e.target.closest && e.target.closest('a[href]');
+  if (link && link.href) {
+    const url = link.href;
+    const risk = Number(link.dataset.cgRisk);
 
     if (risk >= 70) {
       e.preventDefault();
-      const prediction = e.target.dataset.cgPrediction;
+      e.stopPropagation();
+      const prediction = link.dataset.cgPrediction || 'Threat Detected';
       showWarningPopup(url, risk, prediction);
     }
   }

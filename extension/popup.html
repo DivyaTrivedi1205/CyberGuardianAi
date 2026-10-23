@@ -12,114 +12,192 @@
       <div class="logo">
         <span class="logo-text">CG</span>
       </div>
-      <h1>CyberGuardian AI</h1>
+      <div class="header-titles">
+        <h1>CyberGuardian AI</h1>
+        <span class="header-badge">Security Suite</span>
+      </div>
     </header>
 
     <div id="status" class="status"></div>
 
     <main class="content">
-      <!-- Analysis Mode Selector -->
-      <div class="mode-selector">
-        <button id="urlMode" class="mode-btn active" data-mode="url">
-          <span>🔗</span>
-          <span>URL Check</span>
-        </button>
-        <button id="messageMode" class="mode-btn" data-mode="message">
-          <span>💬</span>
-          <span>Message</span>
-        </button>
-      </div>
-
-      <!-- URL Analysis Panel -->
-      <div id="urlPanel" class="analysis-panel active">
-        <div class="input-group">
-          <label for="urlInput">Enter URL to analyze</label>
-          <input
-            id="urlInput"
-            type="text"
-            placeholder="https://example.com"
-            class="input-field"
-          />
-        </div>
-        <button id="analyzeUrlBtn" class="btn-primary">
-          <span>Analyze URL</span>
-          <span id="urlSpinner" class="spinner hidden"></span>
-        </button>
-      </div>
-
-      <!-- Message Analysis Panel -->
-      <div id="messagePanel" class="analysis-panel hidden">
-        <div class="input-group">
-          <label for="messageInput">Enter text to analyze</label>
-          <textarea
-            id="messageInput"
-            placeholder="Paste message or email text..."
-            class="input-field"
-            rows="3"
-          ></textarea>
-        </div>
-        <button id="analyzeMessageBtn" class="btn-primary">
-          <span>Analyze Message</span>
-          <span id="messageSpinner" class="spinner hidden"></span>
-        </button>
-      </div>
-
-      <!-- Results Panel -->
-      <div id="results" class="results-panel hidden">
-        <div class="result-header">
-          <h2 id="resultTitle">Analysis Result</h2>
-          <button id="closeResults" class="btn-close">×</button>
+      <!-- Main Scanners View -->
+      <div id="mainScanners" class="main-scanners-view">
+        <!-- Analysis Mode Selector -->
+        <div class="mode-selector">
+          <button id="urlMode" class="mode-btn active" data-mode="url" type="button">
+            <span class="mode-icon">🔗</span>
+            <span>URL</span>
+          </button>
+          <button id="messageMode" class="mode-btn" data-mode="message" type="button">
+            <span class="mode-icon">💬</span>
+            <span>Message</span>
+          </button>
+          <button id="passwordMode" class="mode-btn" data-mode="password" type="button">
+            <span class="mode-icon">🔑</span>
+            <span>Password</span>
+          </button>
+          <button id="deepfakeMode" class="mode-btn" data-mode="deepfake" type="button">
+            <span class="mode-icon">🎭</span>
+            <span>Media</span>
+          </button>
         </div>
 
-        <div id="resultContent" class="result-content">
-          <!-- Risk Score -->
-          <div class="risk-section">
-            <div class="score-display">
-              <span id="riskScore" class="score-number">—</span>
-              <span class="score-unit">/100</span>
+        <!-- URL Analysis Panel -->
+        <div id="urlPanel" class="analysis-panel active">
+          <div class="input-group">
+            <label for="urlInput">Enter URL to analyze</label>
+            <input
+              id="urlInput"
+              type="text"
+              placeholder="https://example.com"
+              class="input-field"
+            />
+          </div>
+          <button id="analyzeUrlBtn" class="btn-primary" type="button">
+            <span>Analyze URL</span>
+            <span id="urlSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+
+        <!-- Message Analysis Panel -->
+        <div id="messagePanel" class="analysis-panel">
+          <div class="input-group">
+            <label for="messageInput">Enter text to analyze</label>
+            <textarea
+              id="messageInput"
+              placeholder="Paste suspicious email, SMS, or DM text..."
+              class="input-field"
+              rows="3"
+            ></textarea>
+          </div>
+          <button id="analyzeMessageBtn" class="btn-primary" type="button">
+            <span>Analyze Message</span>
+            <span id="messageSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+
+        <!-- Password Analysis Panel -->
+        <div id="passwordPanel" class="analysis-panel">
+          <div class="input-group">
+            <label for="passwordInput">Enter password to check strength</label>
+            <div class="password-input-wrapper">
+              <input
+                id="passwordInput"
+                type="password"
+                placeholder="Enter password..."
+                class="input-field"
+                autocomplete="off"
+              />
+              <button type="button" id="togglePasswordBtn" class="btn-toggle-eye" title="Toggle visibility">👁️</button>
             </div>
-            <span id="riskCategory" class="risk-category">Analyzing...</span>
-            <div class="score-bar">
-              <div id="scoreBar" class="score-fill"></div>
+            <p class="field-hint">Never persisted or logged. Cleared immediately upon analysis.</p>
+          </div>
+          <button id="analyzePasswordBtn" class="btn-primary" type="button">
+            <span>Analyze Password</span>
+            <span id="passwordSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+
+        <!-- Media / Deepfake Analysis Panel -->
+        <div id="deepfakePanel" class="analysis-panel">
+          <div class="input-group">
+            <label for="deepfakeInput">Upload image or video for forensic scan</label>
+            <input
+              id="deepfakeInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+              class="input-field file-input"
+            />
+            <p id="fileSelectedInfo" class="field-hint">Supports JPG, PNG, WEBP, MP4, WEBM (Max 10MB)</p>
+          </div>
+          <button id="analyzeDeepfakeBtn" class="btn-primary" type="button">
+            <span>Analyze Media</span>
+            <span id="deepfakeSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+
+        <!-- Results Panel -->
+        <div id="results" class="results-panel">
+          <div class="result-header">
+            <h2 id="resultTitle">Analysis Result</h2>
+            <button id="closeResults" class="btn-close" type="button" title="Close result">×</button>
+          </div>
+
+          <div id="resultContent" class="result-content">
+            <!-- Risk Score & Prediction Badge -->
+            <div class="risk-section">
+              <div class="score-display">
+                <span id="riskScore" class="score-number">—</span>
+                <span id="scoreUnit" class="score-unit">/100</span>
+              </div>
+              <span id="riskCategory" class="risk-category">Analyzing...</span>
+              <div class="score-bar">
+                <div id="scoreBar" class="score-fill"></div>
+              </div>
             </div>
-          </div>
 
-          <!-- Explanation -->
-          <div class="explanation-section">
-            <h3>Risk Signals</h3>
-            <ul id="feedbackList" class="feedback-list"></ul>
-          </div>
+            <!-- Details Section (Crack time, metadata, etc.) -->
+            <div id="detailsSection" class="details-section hidden">
+              <div id="detailsContent" class="details-grid"></div>
+            </div>
 
-          <!-- Features (for URLs) -->
-          <div id="featuresSection" class="features-section hidden">
-            <h3>Analysis Features</h3>
-            <div id="featuresList" class="features-list"></div>
-          </div>
+            <!-- Risk Signals / Feedback -->
+            <div class="explanation-section">
+              <h3 id="feedbackHeading">Risk Signals & Findings</h3>
+              <ul id="feedbackList" class="feedback-list"></ul>
+            </div>
 
-          <!-- Psychology Signals (for URLs) -->
-          <div id="psychologySection" class="psychology-section hidden">
-            <h3>Scam Psychology Triggers</h3>
-            <div id="psychologyList" class="psychology-list"></div>
-          </div>
+            <!-- Recommendations (e.g. for Password) -->
+            <div id="recommendationsSection" class="recommendations-section hidden">
+              <h3>Recommendations</h3>
+              <ul id="recommendationsList" class="feedback-list"></ul>
+            </div>
 
-          <!-- Error Message -->
-          <div id="errorMessage" class="error-message hidden"></div>
+            <!-- Features (for URLs) -->
+            <div id="featuresSection" class="features-section hidden">
+              <h3>Analysis Features</h3>
+              <div id="featuresList" class="features-list"></div>
+            </div>
+
+            <!-- Psychology Signals (for URLs and Messages) -->
+            <div id="psychologySection" class="psychology-section hidden">
+              <h3>Scam Psychology Triggers</h3>
+              <div id="psychologyList" class="psychology-list"></div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="error-message hidden"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Configuration -->
-      <div class="config-section">
-        <label for="backendUrl">Backend URL:</label>
-        <div class="config-input-group">
-          <input
-            id="backendUrl"
-            type="text"
-            placeholder="http://127.0.0.1:8000"
-            class="config-input"
-          />
-          <button id="saveConfig" class="btn-secondary">Save</button>
+      <!-- Dedicated Settings View -->
+      <div id="settingsView" class="settings-view hidden">
+        <div class="settings-header">
+          <button id="backFromSettingsBtn" class="btn-secondary btn-back" type="button">← Back</button>
+          <h2>Backend Configuration</h2>
         </div>
-        <div id="configStatus" class="config-status"></div>
+
+        <div class="settings-body">
+          <div class="input-group">
+            <label for="backendUrl">FastAPI Backend URL:</label>
+            <input
+              id="backendUrl"
+              type="text"
+              placeholder="http://127.0.0.1:8000"
+              class="input-field"
+            />
+            <p class="field-hint">Default: http://127.0.0.1:8000. Used for all real-time threat intelligence scans.</p>
+          </div>
+
+          <div class="settings-actions">
+            <button id="saveConfig" class="btn-primary" type="button">Save Settings</button>
+            <button id="testConnectionBtn" class="btn-secondary" type="button">Test Connection</button>
+          </div>
+
+          <div id="configStatus" class="config-status"></div>
+        </div>
       </div>
     </main>
 
@@ -131,3 +209,4 @@
   <script src="popup.js"></script>
 </body>
 </html>
+

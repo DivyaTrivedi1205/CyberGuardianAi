@@ -1,0 +1,56 @@
+{
+    "source_path": "NeuralTextures/845_846.mp4",
+    "label": "FAKE",
+    "split": "train",
+    "manipulation": "NeuralTextures",
+    "fractions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+    ],
+    "target_size": [
+        224,
+        224
+    ],
+    "prep_version": "1.0",
+    "extracted_count": 5,
+    "frames": [
+        {
+            "fraction": 0.1,
+            "file": "frame_10_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 13723
+        },
+        {
+            "fraction": 0.3,
+            "file": "frame_30_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 13057
+        },
+        {
+            "fraction": 0.5,
+            "file": "frame_50_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 14082
+        },
+        {
+            "fraction": 0.7,
+            "file": "frame_70_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 13660
+        },
+        {
+            "fraction": 0.9,
+            "file": "frame_90_dnn_extracted.jpg",
+            "status": "success",
+            "method": "dnn_extracted",
+            "bytes": 13365
+        }
+    ]
+}

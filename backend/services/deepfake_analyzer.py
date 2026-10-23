@@ -356,9 +356,9 @@ def analyze_deepfake(
         )
         metadata_score = 10
         if not has_exif:
-            metadata_score = 45
+            metadata_score = 25  # Reduced from 45 - many legitimate images lack EXIF
             feedback.append(
-                "Missing EXIF Metadata: File lacks standard camera capture tags (model, aperture, GPS) typical of genuine device photos."
+                "Missing EXIF Metadata: File lacks standard camera capture tags (model, aperture, GPS) typical of genuine device photos. Not a definitive AI indicator."
             )
         elif has_genuine_camera:
             metadata_score = 5
@@ -408,12 +408,10 @@ def analyze_deepfake(
                 features[k] = max(features[k], 85)
         else:
             raw_risk = cnn_risk_score
-            forensics_anomaly_avg = (edge_blending_score + bg_warping_score) / 2.0
-            if forensics_anomaly_avg > 80 and raw_risk < 50:
-                raw_risk = int(raw_risk * 0.6 + forensics_anomaly_avg * 0.4)
-                feedback.append(
-                    "Localized Compression/Noise Mismatch: Pixel structures suggest copy-paste composition or local manipulation."
-                )
+            # NOTE: Forensic anomaly scores (Edge Blending, Background Warping) are
+            # displayed but NOT used to override the CNN prediction. This prevents
+            # false positives on real images with natural noise patterns.
+            # The CNN (EfficientNet-B0 trained on FaceForensics++) is the primary classifier.
 
             if has_genuine_camera and raw_risk < 85:
                 raw_risk = max(3, int(raw_risk * 0.3))
